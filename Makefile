@@ -14,6 +14,7 @@ DIR_BUILD         := build
 
 CXXFLAGS  := -O2 -std=c++17 -I$(DIR_INCLUDE)
 NVCCFLAGS := -O2 -I$(DIR_INCLUDE) --compiler-options '-fPIC'
+LDFLAGS   := $(shell sdl2-config --cflags --libs)
 
 V ?= 0
 ifeq ($(V),1)
@@ -43,7 +44,7 @@ ALL_OBJS := $(CU_OBJS) $(CXX_OBJS)
 all: $(TARGET)
 
 $(TARGET): $(ALL_OBJS)
-	$(call do_cmd,LD,$@,$(NVCC) -o $@ $^)
+	$(call do_cmd,LD,$@,$(NVCC) $(LDFLAGS) -o $@ $^)
 	@printf "\n$(BOLD_AND_GREEN)Build successful$(RESET)\n"
 
 $(DIR_BUILD)/%.o: %.cu

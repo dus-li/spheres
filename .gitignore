@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: NONE
 
-build
-spheres
-compile_commands.json
 **/*.swp
+.cache
+
+build
+compile_commands.json
+spheres

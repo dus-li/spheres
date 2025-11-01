@@ -3,8 +3,4 @@
 
 #pragma once
 
-namespace host {
-
-void test();
-
-} // namespace host
+typedef uint32_t u32;

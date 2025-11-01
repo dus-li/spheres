@@ -1,20 +1,32 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: Dus'li
 
+#include <exception>
 #include <iostream>
 
-#include "host/test.hxx"
+#include "host/appwindow.hxx"
 
 #include "device/test.cuh"
 
 int main()
 {
-	std::cout << "Hello from host!" << std::endl;
+	const unsigned width  = 640;
+	const unsigned height = 480;
 
-	host::test();
-	device::test<<<1, 4>>>();
+	u32 *fb = new uint32_t[width * height * sizeof(uint32_t)];
 
-	cudaDeviceSynchronize();
+	try {
+		host::AppWindow app("Test Window", width, height, fb);
+
+		while (app.is_running()) {
+			app.handle_events();
+			app.update();
+			SDL_Delay(16);
+		}
+	} catch (const std::exception &e) {
+		std::cerr << "Error: " << e.what() << std::endl;
+		return 1;
+	}
 
 	return 0;
 }

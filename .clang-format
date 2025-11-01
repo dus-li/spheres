@@ -38,7 +38,7 @@ IndentCaseLabels: false
 IndentPPDirectives: BeforeHash
 PPIndentWidth: 2
 Language: Cpp
-NamespaceIndentation: None
+NamespaceIndentation: Inner
 PointerAlignment: Right
 ContinuationIndentWidth: 4
 IndentWidth: 8
@@ -48,19 +48,31 @@ UseTab: AlignWithSpaces
 SpaceAfterCStyleCast: false
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: '<.*>'
+  - Regex: '^<[^/]*>'
     Priority: 1
     SortPriority: 10
-  - Regex: '^"host/.*\.hxx'
+  - Regex: '^<SDL2/.*>'
     Priority: 2
     SortPriority: 20
-  - Regex: '^"device/.*\.cuh'
+  - Regex: '^"host/.*\.hxx'
     Priority: 3
     SortPriority: 30
-  - Regex: '^".*\.hxx'
+  - Regex: '^"device/.*\.cuh'
     Priority: 4
     SortPriority: 40
+  - Regex: '^".*\.hxx'
+    Priority: 5
+    SortPriority: 50
 IncludeIsMainRegex: 'NOTHING_AKJSDHFKJAHD87F6A8S70DUHAKJSNBDVASDJHFAUISHF'
 SortIncludes: true
 KeepEmptyLinesAtTheStartOfBlocks: true
 #TypenameMacros:
+#NumericLiteralCase:
+#  ExponentLetter: Lower
+#  HexDigit: Upper
+#  Prefix: Lower
+#  Suffix: Upper
+WrapNamespaceBodyWithEmptyLines: Always
+IndentAccessModifiers: false
+AccessModifierOffset: -6
+EmptyLineBeforeAccessModifier: LogicalBlock
