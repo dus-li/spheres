@@ -25,7 +25,7 @@ void deleters_sdl::TextureDeleter::operator()(SDL_Texture *t) const
 		SDL_DestroyTexture(t);
 }
 
-AppWindow::AppWindow(string name, unsigned width, unsigned height, u32 *buf)
+AppWindow::AppWindow(string name, unsigned width, unsigned height, Buffer buf)
     : width(width)
     , height(height)
     , name(name)
@@ -80,7 +80,9 @@ void AppWindow::handle_events()
 
 void AppWindow::update()
 {
-	SDL_UpdateTexture(texture.get(), nullptr, buf, width * sizeof(u32));
+	unsigned stride = 4 * width;
+
+	SDL_UpdateTexture(texture.get(), nullptr, buf.data(), stride);
 	SDL_RenderClear(renderer.get());
 	SDL_RenderCopy(renderer.get(), texture.get(), nullptr, nullptr);
 	SDL_RenderPresent(renderer.get());

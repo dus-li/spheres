@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <SDL2/SDL.h>
 
@@ -45,14 +46,15 @@ namespace deleters_sdl {
 using UniqueWindow   = unique_ptr<SDL_Window, deleters_sdl::WindowDeleter>;
 using UniqueRenderer = unique_ptr<SDL_Renderer, deleters_sdl::RendererDeleter>;
 using UniqueTexture  = unique_ptr<SDL_Texture, deleters_sdl::TextureDeleter>;
+using Buffer         = std::vector<u32> &;
 
 /** An application window class. */
 class AppWindow {
 	unsigned       width;    ///< Width of the window.
 	unsigned       height;   ///< Height of the window.
 	string         name;     ///< Title of the window.
-	u32           *buf;      ///< Framebuffer.
 	bool           running;  ///< False if application was closed.
+	Buffer         buf;      ///< Framebuffer.
 	UniqueWindow   window;   ///< SDL window.
 	UniqueRenderer renderer; ///< SDL renderer.
 	UniqueTexture  texture;  ///< SDL texture displayed by renderer.
@@ -67,7 +69,7 @@ class AppWindow {
 	 *
 	 * @throws std::runtime_error When internal object creation fails.
 	 */
-	AppWindow(string name, unsigned width, unsigned height, u32 *buf);
+	AppWindow(string name, unsigned width, unsigned height, Buffer buf);
 	~AppWindow();
 
 	/**

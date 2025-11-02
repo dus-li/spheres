@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: Dus'li
 
-#include <stdio.h>
-
 namespace device {
 
-__global__ void test();
+__global__ void render(uchar4 *fb, int width, int height, float t);
 
 } // namespace device
