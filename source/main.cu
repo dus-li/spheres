@@ -8,7 +8,7 @@
 #include "host/appwindow.hxx"
 
 #include "device/framebuffer.cuh"
-#include "device/test.cuh"
+#include "device/sphere.cuh"
 
 using device::Framebuffer;
 
@@ -27,29 +27,32 @@ int main()
 	const unsigned height = 480;
 
 	Framebuffer fb(width * height);
-	cudaError_t ret;
-	float       time = 0;
 
-	dim3 blk(16, 16);
-	dim3 grd((width + blk.x - 1) / blk.x, (height + blk.y - 1) / blk.y);
+	dim3   blk(32, 32);
+	dim3   grd((width + 31) / 32, (height + 31) / 32);
+	float3 cam = make_float3(0.0, 0.0, 1.5);
 
 	try {
+		device::Spheres s(10, 20);
+		s.randomize();
+
 		host::AppWindow app("Test Window", width, height, fb.h_fb);
 
 		while (app.is_running()) {
 			app.handle_events();
 
-			device::render<<<grd, blk>>>(fb.d_fb.get(),
+			device::kernels::render<<<grd, blk>>>(fb.d_fb.get(),
 			    width,
 			    height,
-			    time);
-			ret = cudaDeviceSynchronize();
+			    s.get_mdesc(),
+			    s.get_sdesc(),
+			    cam);
+			cudaError_t ret = cudaDeviceSynchronize();
 			error_wrapper(ret);
 
 			fb.sync();
-			time += .016;
-
 			app.update();
+
 			SDL_Delay(16);
 		}
 	} catch (const std::exception &e) {
