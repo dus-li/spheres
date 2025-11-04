@@ -58,7 +58,7 @@ static inline void randf_(U *dest, size_t n, T lo, T up, builder<U, T> build)
 	try {
 		rand__<U, T, D>(dest, n, lo, up, build);
 	} catch (const std::exception &e) {
-		throw std::runtime_error(e.what());
+		throw;
 	}
 }
 
@@ -97,7 +97,7 @@ static inline void randi_(U *dest, size_t n, T lo, T up, builder<U, T> build)
 	try {
 		rand__<U, T, D>(dest, n, lo, up, build);
 	} catch (const std::exception &e) {
-		throw std::runtime_error(e.what());
+		throw;
 	}
 }
 
@@ -128,7 +128,7 @@ MaterialSet::MaterialSet(size_t count)
 		ambients  = make_unique_cuda<float4>(count);
 		shininess = make_unique_cuda<float>(count);
 	} catch (const std::exception &e) {
-		throw std::runtime_error(e.what());
+		throw;
 	}
 }
 
@@ -140,7 +140,7 @@ void MaterialSet::randomize()
 		randf_(ambients.get(), count, 0.05f, 0.2f, f4build1);
 		randf_(shininess.get(), count, 4.0f, 128.0f, f1build);
 	} catch (const std::exception &e) {
-		throw std::runtime_error(e.what());
+		throw;
 	}
 }
 
@@ -152,7 +152,7 @@ SphereSet::SphereSet(size_t count)
 		radiuses  = make_unique_cuda<float>(count);
 		materials = make_unique_cuda<size_t>(count);
 	} catch (const std::exception &e) {
-		throw std::runtime_error(e.what());
+		throw;
 	}
 }
 
@@ -165,7 +165,7 @@ void SphereSet::randomize(size_t material_count)
 		randf_(radiuses.get(), count, 0.1f, 0.2f, f1build);
 		randi_(materials.get(), count, mat_lo, material_count, szbuild);
 	} catch (const std::exception &e) {
-		throw std::runtime_error(e.what());
+		throw;
 	}
 }
 
@@ -180,7 +180,7 @@ Spheres::Spheres(size_t material_count, size_t sphere_count)
 		init_mdesc();
 		init_sdesc();
 	} catch (const std::exception &e) {
-		throw std::runtime_error(e.what());
+		throw;
 	}
 }
 

@@ -16,7 +16,7 @@ Framebuffer::Framebuffer(size_t count)
 	try {
 		d_fb = make_unique_cuda<uchar4>(count);
 	} catch (const std::exception &e) {
-		throw std::runtime_error(e.what());
+		throw;
 	}
 }
 
