@@ -1,121 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: Dus'li
 
-#include <algorithm>
 #include <exception>
-#include <functional>
-#include <random>
 #include <stdexcept>
 
+#include "device/randomizer.cuh"
 #include "device/sphere.cuh"
 
 #include "types.hxx"
-
-template <typename U, typename T>
-using builder = std::function<U(std::function<T()>)>;
-
-template <typename U, typename T, typename G>
-static void rand__(U *dest, size_t n, T lo, T up, builder<U, T> build)
-{
-	std::random_device rd;
-
-	std::mt19937 gen(rd());
-	cudaError_t  ret;
-
-	G dist(lo, up);
-
-	auto   next = [&dist, &gen]() { return dist(gen); };
-	size_t size = sizeof(U) * n;
-
-	std::vector<U> tmp(n);
-	std::generate(tmp.begin(), tmp.end(), [&build, &next]() {
-		return build(next);
-	});
-
-	ret = cudaMemcpy(dest, tmp.data(), size, cudaMemcpyHostToDevice);
-	if (ret != cudaSuccess)
-		throw std::runtime_error("Failed to copy to device");
-}
-
-/**
- * Fill a buffer of compound types with random reals drawn from U[lo, up].
- * @tparam U     Compound type.
- * @tparam T     Single element type.
- * @param  dest  Destination buffer.
- * @param  n     Number of elements in the buffer.
- * @param  lo    Lower bound for the random numbers, inclusive.
- * @param  up    Upper bound for the random numbers, exclusive.
- * @param  build Builder function constructing a compound type instance.
- *
- * @throws std::runtime_error
- * @see randi_
- */
-template <typename U, typename T>
-static inline void randf_(U *dest, size_t n, T lo, T up, builder<U, T> build)
-{
-	using D = std::uniform_real_distribution<T>;
-
-	try {
-		rand__<U, T, D>(dest, n, lo, up, build);
-	} catch (const std::exception &e) {
-		throw;
-	}
-}
-
-/**
- * Fill a buffer of compound types with random integers drawn from U[lo, up].
- * @tparam U     Compound type.
- * @tparam T     Single element type.
- * @param  dest  Destination buffer.
- * @param  n     Number of elements in the buffer.
- * @param  lo    Lower bound for the random numbers, inclusive.
- * @param  up    Upper bound for the random numbers, exclusive.
- * @param  build Builder function constructing a compound type instance.
- *
- * @throws std::runtime_error
- * @see randf_
- *
- * @todo Check @a up value at compile-time.
- */
-template <typename U, typename T>
-static inline void randi_(U *dest, size_t n, T lo, T up, builder<U, T> build)
-{
-	using D = std::uniform_int_distribution<T>;
-
-	// Unlike uniform_float_distribution(), the integer one produces values
-	// from a closed interval, rather than a one-side open one. To keep
-	// interface uniform, we will subtract one, but first its good to check
-	// if we can do that :DD
-	//
-	// Probably better to const and static_assert<> but meh, its not
-	// critical, ill improve this later.
-	if (up - 1 < lo || up < up - 1)
-		throw std::runtime_error("Incorrect upper randi_() bound");
-
-	up -= 1;
-
-	try {
-		rand__<U, T, D>(dest, n, lo, up, build);
-	} catch (const std::exception &e) {
-		throw;
-	}
-}
-
-static builder<float4, float> f4build0 = [](std::function<float()> next) {
-	return make_float4(next(), next(), next(), 0.0);
-};
-
-static builder<float4, float> f4build1 = [](std::function<float()> next) {
-	return make_float4(next(), next(), next(), 1.0);
-};
-
-static builder<float, float> f1build = [](std::function<float()> next) {
-	return next();
-};
-
-static builder<size_t, size_t> szbuild = [](std::function<size_t()> next) {
-	return next();
-};
 
 namespace device {
 
@@ -135,10 +27,10 @@ MaterialSet::MaterialSet(size_t count)
 void MaterialSet::randomize()
 {
 	try {
-		randf_(speculars.get(), count, 0.1f, 1.0f, f4build1);
-		randf_(diffuses.get(), count, 0.2f, 1.0f, f4build1);
-		randf_(ambients.get(), count, 0.05f, 0.2f, f4build1);
-		randf_(shininess.get(), count, 4.0f, 128.0f, f1build);
+		rand_fill_float4_1(speculars.get(), count, 0.1f, 1.0f);
+		rand_fill_float4_1(diffuses.get(), count, 0.2f, 1.0f);
+		rand_fill_float4_1(ambients.get(), count, 0.05f, 0.2f);
+		rand_fill_float(shininess.get(), count, 4.0f, 128.0f);
 	} catch (const std::exception &e) {
 		throw;
 	}
@@ -158,12 +50,12 @@ SphereSet::SphereSet(size_t count)
 
 void SphereSet::randomize(size_t material_count)
 {
-	const size_t mat_lo = 0;
+	const size_t lo = 0;
 
 	try {
-		randf_(centers.get(), count, -0.5f, 0.5f, f4build0);
-		randf_(radiuses.get(), count, 0.1f, 0.2f, f1build);
-		randi_(materials.get(), count, mat_lo, material_count, szbuild);
+		rand_fill_float4_0(centers.get(), count, -0.5f, 0.5f);
+		rand_fill_float(radiuses.get(), count, 0.1f, 0.2f);
+		rand_fill_size_t(materials.get(), count, lo, material_count);
 	} catch (const std::exception &e) {
 		throw;
 	}
