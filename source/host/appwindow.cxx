@@ -29,8 +29,8 @@ AppWindow::AppWindow(string name, unsigned width, unsigned height, Buffer buf)
     : width(width)
     , height(height)
     , name(name)
-    , buf(buf)
     , running(true)
+    , buf(buf)
 {
 	if (SDL_Init(SDL_INIT_VIDEO))
 		throw std::runtime_error("Failed to initialize SDL");

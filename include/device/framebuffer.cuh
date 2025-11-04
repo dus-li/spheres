@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <tuple>
 #include <vector>
 
 #include "device/unique.cuh"
@@ -16,8 +17,10 @@ using std::vector;
 
 /** A pairing of syncable device and host buffers. */
 class Framebuffer {
-	size_t count; ///< Number of RGBA cells in the buffer.
-	size_t size;  ///< Size of each of the buffers, in bytes.
+	size_t   count; ///< Number of RGBA cells in the buffer.
+	size_t   size;  ///< Size of each of the buffers, in bytes.
+	unsigned width;
+	unsigned height;
 
   public:
 	unique_cuda<uchar4> d_fb; ///< Device-side buffer.
@@ -29,13 +32,15 @@ class Framebuffer {
 	 *
 	 * @throws std::runtime_error Failed to allocate a buffer.
 	 */
-	Framebuffer(size_t count);
+	Framebuffer(unsigned width, unsigned height);
 
 	/**
 	 * Copy contents of the devicce buffer to the host buffer.
 	 * @throws std::runtime_error Failed to copy.
 	 */
 	void sync();
+
+	dim3 get_dims();
 };
 
 } // namespace device

@@ -7,8 +7,10 @@
 
 namespace device {
 
-Framebuffer::Framebuffer(size_t count)
-    : count(count)
+Framebuffer::Framebuffer(unsigned width, unsigned height)
+    : count(width * height)
+    , width(width)
+    , height(height)
 {
 	size = count * sizeof(uchar4);
 	h_fb.reserve(count);
@@ -27,6 +29,11 @@ void Framebuffer::sync()
 	r = cudaMemcpy(h_fb.data(), d_fb.get(), size, cudaMemcpyDeviceToHost);
 	if (r != cudaSuccess)
 		throw std::runtime_error("Failed to copy to host");
+}
+
+dim3 Framebuffer::get_dims()
+{
+	return dim3(width, height);
 }
 
 } // namespace device
