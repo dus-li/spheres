@@ -83,22 +83,20 @@ static inline std::runtime_error rand_err_cons(int code)
 #define DECLARE_IDENTITY_FILLER(backend, type) \
 	DECLARE_FILLER(backend, type, type, next();)
 
-// clang-format off
 DECLARE_FILLER(_rand_fillf, float4, float,
-    make_float4(next(), next(), next(), next());
+    make_float4(next(), next(), next(), next()); /**/
 )
 
 DECLARE_NAMED_FILLER(rand_fill_float4_0, _rand_fillf, float4, float,
-    make_float4(next(), next(), next(), 0.0f);
+    make_float4(next(), next(), next(), 0.0f); /**/
 )
 
 DECLARE_NAMED_FILLER(rand_fill_float4_1, _rand_fillf, float4, float,
-    make_float4(next(), next(), next(), 1.0f);
+    make_float4(next(), next(), next(), 1.0f); /**/
 )
 
 DECLARE_IDENTITY_FILLER(_rand_fillf, float)
 DECLARE_IDENTITY_FILLER(_rand_filli, size_t)
-// clang-format on
 
 } // namespace device
 
