@@ -16,7 +16,7 @@ int main()
 
 	try {
 		device::Framebuffer fb(width, height);
-		device::Scene       scene(10, 20, 2);
+		device::Scene       scene(20, 20, 1);
 		scene.randomize();
 
 		host::AppWindow app("Spheres", width, height, fb.h_fb);

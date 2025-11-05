@@ -28,7 +28,7 @@ void MaterialSet::randomize()
 		rand_fill_float4_1(speculars.get(), count, 0.1f, 1.0f);
 		rand_fill_float4_1(diffuses.get(), count, 0.2f, 1.0f);
 		rand_fill_float4_1(ambients.get(), count, 0.05f, 0.2f);
-		rand_fill_float(shininess.get(), count, 4.0f, 128.0f);
+		rand_fill_float(shininess.get(), count, 0.5f, 30.0f);
 	} catch (const std::exception &e) {
 		throw;
 	}

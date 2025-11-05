@@ -87,16 +87,4 @@ class Spheres {
 	SphereSetDescriptor *get_sdesc();
 };
 
-/******************************************************************************/
-/* EVERYTHING BELOW THIS LINE IS UGLY, TEMPORARY AND POSSIBLY INCORRECT       */
-/******************************************************************************/
-
-namespace kernels {
-
-	__global__ void render(uchar4 *fb, int width, int height,
-	    MaterialSetDescriptor *mats, SphereSetDescriptor *spheres,
-	    float3 cam);
-
-} // namespace kernels
-
 } // namespace device

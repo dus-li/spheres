@@ -2,10 +2,12 @@
 // SPDX-FileCopyrightText: Dus'li
 
 #include <exception>
+#include <float.h>
 #include <stdexcept>
 
 #include "device/randomizer.cuh"
 #include "device/scene.cuh"
+#include "device/vecops.cuh"
 
 #include "types.hxx"
 
@@ -13,11 +15,7 @@ namespace device {
 
 namespace kernels {
 
-	__global__ void render_old(uchar4 *fb, dim3 dims,
-	    MaterialSetDescriptor *mats, SphereSetDescriptor *spheres,
-	    float3 cam);
-
-	__global__ void render2(uchar4 *fb, dim3 dims,
+	__global__ void render(uchar4 *fb, dim3 dims,
 	    MaterialSetDescriptor *mats, SphereSetDescriptor *spheres,
 	    LightSetDescriptor *lights, float3 cam, float3 ambient);
 
@@ -53,11 +51,13 @@ void Scene::render_to(Framebuffer &fb)
 	dim3 blk(16, 16);
 	dim3 grd((fbdim.x + blk.x - 1) / blk.x, (fbdim.y + blk.y - 1) / blk.y);
 
-	kernels::render_old<<<grd, blk>>>(fb.d_fb.get(),
+	kernels::render<<<grd, blk>>>(fb.d_fb.get(),
 	    fbdim,
 	    spheres.get_mdesc(),
 	    spheres.get_sdesc(),
-	    cam);
+	    lights.get_desc(),
+	    cam,
+	    ambient);
 
 	cudaError_t tmp = cudaDeviceSynchronize();
 	if (tmp != cudaSuccess)
@@ -70,100 +70,125 @@ void Scene::render_to(Framebuffer &fb)
 
 namespace device::kernels {
 
-/******************************************************************************/
-/* EVERYTHING BELOW THIS LINE IS UGLY, TEMPORARY AND POSSIBLY INCORRECT       */
-/******************************************************************************/
-
-#if (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-  #define make_color(r, g, b, a) make_uchar4(a, b, g, r)
-#else
-  #define make_color(r, g, b, a) make_uchar4(r, g, b, a)
-#endif
-
-__device__ float3 f4_xyz(float4 f4)
+__device__ bool sphere_hit(float &dist, float3 origin, float3 direction,
+    float3 center, float radius)
 {
-	return make_float3(f4.x, f4.y, f4.z);
-}
+	float3 oc = f3_sub(origin, center);
 
-__device__ float3 f3_sub(float3 a, float3 b)
-{
-	return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
-}
+	// Quadratic equation constants
+	float a = f3_dot(direction, direction);
+	float b = 2 * f3_dot(oc, direction);
+	float c = f3_dot(oc, oc) - radius * radius;
 
-__device__ float f3_dot(float3 a, float3 b)
-{
-	return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-__device__ float3 f3_norm(float3 v)
-{
-	float invlen = rsqrtf(f3_dot(v, v));
-	return make_float3(v.x * invlen, v.y * invlen, v.z * invlen);
-}
-
-__device__ bool hit_sphere(float3 ro, float3 rd, float3 center, float radius,
-    float &t)
-{
-	float3 oc           = f3_sub(ro, center);
-	float  a            = f3_dot(rd, rd);
-	float  b            = 2.0f * f3_dot(oc, rd);
-	float  c            = f3_dot(oc, oc) - radius * radius;
-	float  discriminant = b * b - 4 * a * c;
-
+	float discriminant = b * b - 4 * a * c;
 	if (discriminant < 0)
 		return false;
 
-	t = (-b - sqrtf(discriminant)) / (2.0f * a);
-	return t > 0.0f;
+	dist = (-b - sqrtf(discriminant)) / (2 * a);
+	return dist > 0.0;
 }
 
-__global__ void render_old(uchar4 *fb, dim3 dims, MaterialSetDescriptor *mats,
-    SphereSetDescriptor *spheres, float3 cam)
+__device__ float3 ray_direction(int x, int y, dim3 dims, float fov)
+{
+	float aspect = (float)dims.x / (float)dims.y;
+	float scale  = tanf(fov / 2);
+
+	// Compute NDCs
+	float u = (2 * (x + 0.5f) / dims.x - 1) * aspect * scale;
+	float v = (1 - 2 * (y + 0.5f) / dims.y) * scale;
+
+	return f3_norm(make_float3(u, v, -1.0f));
+}
+
+#define NO_INTERSECTION ((size_t)(~0))
+
+__device__ size_t stare(float3 &n, SphereSetDescriptor *spheres, float3 cam,
+    float3 ray)
+{
+	float  min = FLT_MAX;
+	size_t ret = NO_INTERSECTION;
+
+	for (size_t i = 0; i < spheres->count; ++i) {
+		float3 center = f4_xyz(spheres->centers[i]);
+		float  radius = spheres->radiuses[i];
+		float  dist;
+
+		if (sphere_hit(dist, cam, ray, center, radius) && dist < min) {
+			min = dist;
+			ret = i;
+		}
+	}
+
+	n = f3_norm(f3_sub(cam, f3_add(cam, f3_mul(min, ray))));
+
+	return ret;
+}
+
+#define PI_OVER_2 (1.57f) // roughly
+
+__device__ size_t material_idx(SphereSetDescriptor *spheres, size_t idx)
+{
+	return idx == NO_INTERSECTION ? idx : spheres->materials[idx];
+}
+
+__device__ float3 f3_reflect(float3 incident, float3 n)
+{
+	return f3_sub(incident, f3_mul(2 * f3_dot(incident, n), n));
+}
+
+__device__ void compute_color(float3 &rgb, size_t mat,
+    MaterialSetDescriptor *mats, LightSetDescriptor *lights, float3 n,
+    float3 cam)
+{
+	float3 ka = f4_xyz(mats->ambients[mat]);
+	float3 kd = f4_xyz(mats->diffuses[mat]);
+	float3 ks = f4_xyz(mats->speculars[mat]);
+	float  a  = mats->shininess[mat];
+
+	for (size_t i = 0; i < lights->count; ++i) {
+		float3 l  = f3_norm(f4_xyz(lights->locations[i]));
+		float3 id = f4_xyz(lights->diffuses[i]);
+		float3 is = f4_xyz(lights->speculars[i]);
+
+		// Diffuse term
+		float  nl   = f3_dot(n, l);
+		float3 diff = f3_mul_cwise(id, f3_mul(nl, kd));
+
+		// Specular term
+		float3 r    = f3_reflect(f3_neg(l), n);
+		float  rv   = fmaxf(0.f, f3_dot(r, cam));
+		float3 spec = f3_mul_cwise(is, f3_mul(powf(rv, a), ks));
+
+		rgb = f3_add(rgb, f3_add(diff, spec));
+	}
+}
+
+__global__ void render(uchar4 *fb, dim3 dims, MaterialSetDescriptor *mats,
+    SphereSetDescriptor *spheres, LightSetDescriptor *lights, float3 cam,
+    float3 ambient)
 {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 
+	// In case window dimensions are a little silly.
 	if (x >= dims.x || y >= dims.y)
 		return;
 
-	// normalized ray direction
-	float  u = (2.0f * (x + 0.5f) / dims.x - 1.0f) * (float)dims.x / dims.y;
-	float  v = 1.0f - 2.0f * (y + 0.5f) / dims.y;
-	float3 ray = f3_norm(make_float3(u, v, -1.0f));
+	// Find first sphere that the ray hits (naively, and suboptimally)
+	float3 n;
+	float3 ray = ray_direction(x, y, dims, PI_OVER_2);
+	size_t idx = stare(n, spheres, cam, ray);
+	size_t mat = material_idx(spheres, idx);
 
-	float tMin   = 1e9;
-	int   hitIdx = -1;
+	float3 rgb = ambient;
+	if (mat != NO_INTERSECTION)
+		compute_color(rgb, mat, mats, lights, n, cam);
 
-	// dont look at this. its not gonna be like that in the final version
-	for (int i = 0; i < spheres->count; ++i) {
-		float3 center = f4_xyz(spheres->centers[i]);
-		float  r      = spheres->radiuses[i];
-		float  t;
-
-		if (hit_sphere(cam, ray, center, r, t)) {
-			if (t < tMin) {
-				tMin   = t;
-				hitIdx = i;
-			}
-		}
-	}
-
-	// for testing purposes just use diffuse constant as color.
-	float3 color = make_float3(0.0f, 0.0f, 0.0f);
-	if (hitIdx >= 0) {
-		int    midx = spheres->materials[hitIdx];
-		float4 kd   = mats->diffuses[midx];
-		color       = f4_xyz(kd);
-	}
-
-	fb[y * dims.x + x] = make_color((u8)(fminf(color.x, 1.0f) * 255),
-	    (u8)(fminf(color.y, 1.0f) * 255),
-	    (u8)(fminf(color.z, 1.0f) * 255),
+	fb[y * dims.x + x] = make_rgba(/**/
+	    (u8)(255 * fminf(rgb.x, 1.0f)),
+	    (u8)(255 * fminf(rgb.y, 1.0f)),
+	    (u8)(255 * fminf(rgb.z, 1.0f)),
 	    255);
 }
-
-__global__ void render2(uchar4 *fb, dim3 dims, MaterialSetDescriptor *mats,
-    SphereSetDescriptor *spheres, LightSetDescriptor *lights, float3 cam,
-    float3 ambient);
 
 } // namespace kernels

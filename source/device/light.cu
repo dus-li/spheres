@@ -37,9 +37,9 @@ Lights::Lights(size_t count)
 void Lights::randomize()
 {
 	try {
-		rand_fill_float4_0(locations.get(), count, -2.f, 2.f);
-		rand_fill_float4(diffuses.get(), count, 0.3f, 0.9f);
-		rand_fill_float4(speculars.get(), count, 0.5f, 1.f);
+		rand_fill_float4_0(locations.get(), count, 1.f, 4.f);
+		rand_fill_float4(diffuses.get(), count, 0.5f, 0.5f);
+		rand_fill_float4(speculars.get(), count, 0.05f, 0.05f);
 	} catch (const std::exception &e) {
 		throw;
 	}
