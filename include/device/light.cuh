@@ -37,7 +37,7 @@ class Lights {
 	void randomize();
 
 	/**
-	 * Obtain a descriptor of light sources, usable in CUDA kernels.
+	 * Obtain a descriptor of light sources usable in CUDA kernels.
 	 * @return A device pointer to a product-type with array pointers.
 	 */
 	LightSetDescriptor *get_desc();

@@ -34,12 +34,30 @@ Lights::Lights(size_t count)
 		throw std::runtime_error("Failed to copy to device");
 }
 
+static inline float __lightloc(std::function<float()> next, float lo, float hi)
+{
+	float ret;
+
+	do
+		ret = next();
+	while (ret >= lo && ret <= hi);
+
+	return ret;
+}
+
+DECLARE_NAMED_FILLER(rand_fill_light_loc, _rand_fillf, float4, float,
+    float _x = __lightloc(next, -0.6, 0.6); //
+    float _y = __lightloc(next, -0.6, 0.6); //
+    float _z = __lightloc(next, -0.6, 0.6); //
+    make_float4(_x, _y, _z, 0.0f);          //
+)
+
 void Lights::randomize()
 {
 	try {
-		rand_fill_float4_0(locations.get(), count, 1.f, 4.f);
-		rand_fill_float4(diffuses.get(), count, 0.5f, 0.5f);
-		rand_fill_float4(speculars.get(), count, 0.05f, 0.05f);
+		rand_fill_light_loc(locations.get(), count, -2.0f, 2.0f);
+		rand_fill_float4(diffuses.get(), count, 0.3f, 0.8f);
+		rand_fill_float4(speculars.get(), count, 0.1f, 0.3f);
 	} catch (const std::exception &e) {
 		throw;
 	}

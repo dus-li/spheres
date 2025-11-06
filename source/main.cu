@@ -11,12 +11,12 @@
 
 int main()
 {
-	const unsigned width  = 640;
-	const unsigned height = 480;
+	const unsigned width  = 1280;
+	const unsigned height = 720;
 
 	try {
 		device::Framebuffer fb(width, height);
-		device::Scene       scene(20, 20, 1);
+		device::Scene       scene(5, 20, 4);
 		scene.randomize();
 
 		host::AppWindow app("Spheres", width, height, fb.h_fb);

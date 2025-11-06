@@ -12,8 +12,8 @@
 
 namespace device {
 
-#define RAND_ERR_BOUNDS 1
-#define RAND_ERR_COPY   2
+#define RAND_ERR_BOUNDS (1)
+#define RAND_ERR_COPY   (2)
 
 template <typename C, typename T>
 using builder = std::function<C(std::function<T()>)>;
@@ -67,6 +67,20 @@ static inline std::runtime_error rand_err_cons(int code)
 					 "Unknown error");
 }
 
+/**
+ * Declare a function with custom name that can fill a product type array.
+ * @param name  Name of the function.
+ * @param be    Backend (@ref _rand_fillf or @ref _rand_filli).
+ * @param otype Output product type.
+ * @param itype Input type.
+ * @param body  Body of statement expr computing an instance of @a otype.
+ *
+ * The @a body param can be any sequence of statements, ending with an
+ * expression that evaluates to the type @a otype. It will be repetedly called
+ * to populate elements of the output array. Inside the body one may use an
+ * identifier @a next which is a callable type that yields a random value of
+ * type @a itype.
+ */
 #define DECLARE_NAMED_FILLER(name, be, otype, itype, body)                   \
 	static inline void name(otype *dest, size_t n, itype lo, itype up)   \
 	{                                                                    \
@@ -77,11 +91,23 @@ static inline std::runtime_error rand_err_cons(int code)
 			throw rand_err_cons(_r);                             \
 	}
 
+/**
+ * Declare a function that can fill a product type array.
+ * @see DECLARE_NAMED_FILLER
+ */
 #define DECLARE_FILLER(be, otype, ...) \
 	DECLARE_NAMED_FILLER(CONCAT(rand_fill_, otype), be, otype, __VA_ARGS__)
 
-#define DECLARE_IDENTITY_FILLER(backend, type) \
-	DECLARE_FILLER(backend, type, type, next();)
+/**
+ * Declare a function that can fill an array with random data.
+ * @param be   Backend (@ref _rand_fillf or @ref _rand_filli).
+ * @param type Type of the array.
+ *
+ * This is a special case of @ref DECLARE_FILLER when @a otype and @a itype are
+ * the same type.
+ */
+#define DECLARE_IDENTITY_FILLER(be, type) \
+	DECLARE_FILLER(be, type, type, next();)
 
 DECLARE_FILLER(_rand_fillf, float4, float,
     make_float4(next(), next(), next(), next()); /**/

@@ -2,10 +2,15 @@
 // SPDX-FileCopyrightText: Dus'li
 
 #include <exception>
+#include <iostream>
+#include <random>
+#include <ranges>
 #include <stdexcept>
+#include <string>
 
 #include "device/randomizer.cuh"
 #include "device/sphere.cuh"
+#include "device/vecops.cuh"
 
 namespace device {
 
@@ -22,13 +27,51 @@ MaterialSet::MaterialSet(size_t count)
 	}
 }
 
+static std::array<float4, 3> gen_random_mat_consts(void)
+{
+	static std::random_device rd;
+	static std::mt19937       gen(rd());
+
+	static std::uniform_real_distribution<float> dif(0.5, 0.8);
+	static std::uniform_real_distribution<float> amb(0.05, 0.15);
+
+	float4 d = make_float4(dif(gen), dif(gen), dif(gen), 1.0);
+	float4 a = make_float4(amb(gen), amb(gen), amb(gen), 1.0);
+	float4 s = f4_sub(make_float4(1, 1, 1, 3), f4_add(d, a));
+
+	return { s, d, a };
+}
+
+/** Host to device CUDA memcpy. */
+static inline int __htod_cpy(void *to, void *from, size_t n)
+{
+	return cudaSuccess != cudaMemcpy(to, from, n, cudaMemcpyHostToDevice);
+}
+
 void MaterialSet::randomize()
 {
+	std::vector<float4> _speculars(count);
+	std::vector<float4> _diffuses(count);
+	std::vector<float4> _ambients(count);
+
+	for (size_t i = 0; i < count; ++i) {
+		auto tmp = gen_random_mat_consts();
+
+		_speculars[i] = tmp[0];
+		_diffuses[i]  = tmp[1];
+		_ambients[i]  = tmp[2];
+	}
+
+	size_t size = count * sizeof(float4);
+
+	int ret = __htod_cpy(speculars.get(), _speculars.data(), size) ?:
+	    __htod_cpy(diffuses.get(), _diffuses.data(), size)         ?:
+	    __htod_cpy(ambients.get(), _ambients.data(), size);
+	if (ret)
+		throw rand_err_cons(-RAND_ERR_COPY);
+
 	try {
-		rand_fill_float4_1(speculars.get(), count, 0.1f, 1.0f);
-		rand_fill_float4_1(diffuses.get(), count, 0.2f, 1.0f);
-		rand_fill_float4_1(ambients.get(), count, 0.05f, 0.2f);
-		rand_fill_float(shininess.get(), count, 0.5f, 30.0f);
+		rand_fill_float(shininess.get(), count, 1.0f, 12.0f);
 	} catch (const std::exception &e) {
 		throw;
 	}
@@ -48,12 +91,10 @@ SphereSet::SphereSet(size_t count)
 
 void SphereSet::randomize(size_t material_count)
 {
-	const size_t lo = 0;
-
 	try {
 		rand_fill_float4_0(centers.get(), count, -0.5f, 0.5f);
-		rand_fill_float(radiuses.get(), count, 0.1f, 0.2f);
-		rand_fill_size_t(materials.get(), count, lo, material_count);
+		rand_fill_float(radiuses.get(), count, 0.05f, 0.1f);
+		rand_fill_size_t(materials.get(), count, 0, material_count);
 	} catch (const std::exception &e) {
 		throw;
 	}

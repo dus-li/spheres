@@ -80,5 +80,4 @@ StatementMacros:
   - DECLARE_FILLER
   - DECLARE_IDENTITY_FILLER
   - DECLARE_NAMED_FILLER
-  - f3_cwise_binop__
-  - f3_scalar_op__
+  - SC_CWISE_OPERATIONS
