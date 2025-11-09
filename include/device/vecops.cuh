@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "pproc.hxx"
+#include <cstddef>
 
 #if defined(__BYTE_ORDER__)
   #if (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
@@ -15,97 +15,149 @@
   #error __BYTE_ORDER__ must be defined
 #endif
 
-// clang-format off
-/**
- * X macro describing scalar and component-wise operations.
- *
- * This is a table-like structure describing operations on vector types. Each
- * row corresponds to an operation. First column contains the operation name,
- * whereas the second one is the actual operator used in the operation.
- *
- * Using data from this table, a macro-based engine automatically generates
- * scalar and component-wise operations for types float3 and float4.
- */
-#define SC_CWISE_OPERATIONS(X)   \
-       /*  OP NAME  OPERATOR  */ \
-	X(   add,       +    )   \
-	X(   sub,       -    )   \
-	X(   mul,       *    )
-// clang-format on
-
-/** Pseudodecorator denoting that routine is callable both from host and dev. */
 #define call_any__ __host__ __device__
 
-#define MAKE_F3_SC_OP_(_name, _op)                                   \
-	static inline call_any__ float3 CONCAT(f3_sc_, _name) /**/   \
-	    (float a, float3 v)                                      \
-	{                                                            \
-		return make_float3(a _op v.x, a _op v.y, a _op v.z); \
+namespace device {
+
+template <typename T> struct __VecWrapper;
+
+template <> struct __VecWrapper<float3> {
+	static constexpr size_t nmemb = 3;
+
+	static inline call_any__ float &ith(float3 &v, size_t i)
+	{
+		return ((float *)&v)[i];
 	}
 
-#define MAKE_F3_CWISE_OP_(_name, _op)                                      \
-	static inline call_any__ float3 CONCAT(f3_cwise_, _name) /**/      \
-	    (float3 a, float3 b)                                           \
-	{                                                                  \
-		return make_float3(a.x _op b.x, a.y _op b.y, a.z _op b.z); \
+	static inline call_any__ const float &ith(const float3 &v, size_t i)
+	{
+		return ((const float *)&v)[i];
+	}
+};
+
+template <> struct __VecWrapper<float4> {
+	static constexpr size_t nmemb = 4;
+
+	static inline call_any__ float &ith(float4 &v, size_t i)
+	{
+		return ((float *)&v)[i];
 	}
 
-#define MAKE_F4_SC_OP_(_name, _op)                                 \
-	static inline call_any__ float4 CONCAT(f4_sc_, _name) /**/ \
-	    (float a, float4 v)                                    \
-	{                                                          \
-		return make_float4(/**/                            \
-		    a _op v.x,                                     \
-		    a _op v.y,                                     \
-		    a _op v.z,                                     \
-		    a _op v.w);                                    \
+	static inline call_any__ const float &ith(const float4 &v, size_t i)
+	{
+		return ((const float *)&v)[i];
+	}
+};
+
+template <typename T> static inline constexpr call_any__ T make_vec()
+{
+	if constexpr (__VecWrapper<T>::nmemb == 3)
+		return make_float3(0, 0, 0);
+	else
+		return make_float4(0, 0, 0, 0);
+}
+
+template <typename T, typename O>
+static inline call_any__ T cwise_binary_op(const T &lhs, const T &rhs, O op)
+{
+	T ret = make_vec<T>();
+	for (size_t i = 0; i < __VecWrapper<T>::nmemb; ++i) {
+		__VecWrapper<T>::ith(ret, i) = op(__VecWrapper<T>::ith(lhs, i),
+		    __VecWrapper<T>::ith(rhs, i));
 	}
 
-#define MAKE_F4_CWISE_OP_(_name, _op)                                 \
-	static inline call_any__ float4 CONCAT(f4_cwise_, _name) /**/ \
-	    (float4 a, float4 b)                                      \
-	{                                                             \
-		return make_float4(/**/                               \
-		    a.x _op b.x,                                      \
-		    a.y _op b.y,                                      \
-		    a.z _op b.z,                                      \
-		    a.w _op b.w);                                     \
+	return ret;
+}
+
+template <typename T, typename O>
+static inline call_any__ T scalar_binary_op_lhs(float lhs, const T &rhs, O op)
+{
+	T ret;
+	for (size_t i = 0; i < __VecWrapper<T>::nmemb; ++i) {
+		__VecWrapper<T>::ith(ret, i) = op(lhs,
+		    __VecWrapper<T>::ith(rhs, i));
 	}
 
-// Define all operations.
-SC_CWISE_OPERATIONS(MAKE_F3_SC_OP_)
-SC_CWISE_OPERATIONS(MAKE_F3_CWISE_OP_)
-SC_CWISE_OPERATIONS(MAKE_F4_SC_OP_)
-SC_CWISE_OPERATIONS(MAKE_F4_CWISE_OP_)
+	return ret;
+}
 
-// This could be done by the X macro but at this point automating it would take
-// longer than writing those few lines lol.
-//
-// Could have also been an __attribute__((alias)) if ops were declared with
-// C linkage, but apparently NVCC/G++ does not like static inline aliases in
-// headers and I AM NOT DEBUGGING THAT!
-#define f3_add f3_cwise_add
-#define f3_sub f3_cwise_sub
-#define f4_add f4_cwise_add
-#define f4_sub f4_cwise_sub
+template <typename T, typename O>
+static inline call_any__ T scalar_binary_op_rhs(const T &lhs, float rhs, O op)
+{
+	T ret;
+	for (size_t i = 0; i < __VecWrapper<T>::nmemb; ++i) {
+		__VecWrapper<T>::ith(ret, i) = op(__VecWrapper<T>::ith(lhs, i),
+		    rhs);
+	}
+
+	return ret;
+}
+
+#define VECOPS_OPERATORS(X) \
+	X(+)                \
+	X(-)                \
+	X(*)
+
+#define vecops_make_cwise_binary_operator(_op)                              \
+	template <typename T>                                               \
+	static inline call_any__ T operator _op(const T &lhs, const T &rhs) \
+	{                                                                   \
+		return cwise_binary_op(lhs,                                 \
+		    rhs,                                                    \
+		    [] call_any__(float l, float r) { return l _op r; });   \
+	}
+
+#define vecops_make_scalar_binary_operators(_op)                          \
+	template <typename T>                                             \
+	static inline call_any__ T operator _op(float lhs, const T &rhs)  \
+	{                                                                 \
+		return scalar_binary_op_lhs(lhs,                          \
+		    rhs,                                                  \
+		    [] call_any__(float l, float r) { return l _op r; }); \
+	}                                                                 \
+	template <typename T>                                             \
+	static inline call_any__ T operator _op(const T &lhs, float rhs)  \
+	{                                                                 \
+		return scalar_binary_op_rhs(lhs,                          \
+		    rhs,                                                  \
+		    [] call_any__(float l, float r) { return l _op r; }); \
+	}
+
+VECOPS_OPERATORS(vecops_make_cwise_binary_operator)
+VECOPS_OPERATORS(vecops_make_scalar_binary_operators)
+
+template <typename T>
+static inline call_any__ float dot(const T &lhs, const T &rhs)
+{
+	float ret = 0;
+	for (size_t i = 0; i < __VecWrapper<T>::nmemb; ++i) {
+		ret += __VecWrapper<T>::ith(lhs, i) *
+		    __VecWrapper<T>::ith(rhs, i);
+	}
+
+	return ret;
+}
+
+template <typename T> static inline call_any__ T normalize(const T &v)
+{
+	return v * rsqrtf(dot(v, v));
+}
+
+template <typename T>
+static inline call_any__ T clamp(const T &v, float lo, float up)
+{
+	T ret = make_vec<T>();
+	for (size_t i = 0; i < __VecWrapper<T>::nmemb; ++i) {
+		__VecWrapper<T>::ith(ret, i) = fmaxf(lo,
+		    fminf(up, __VecWrapper<T>::ith(v, i)));
+	}
+
+	return ret;
+}
 
 static inline call_any__ float3 f4_xyz(float4 v)
 {
 	return make_float3(v.x, v.y, v.z);
 }
 
-static inline call_any__ float3 f3_neg(float3 v)
-{
-	return make_float3(-v.x, -v.y, -v.z);
-}
-
-static inline call_any__ float f3_dot(float3 a, float3 b)
-{
-	return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-static inline call_any__ float3 f3_norm(float3 v)
-{
-	float tmp = rsqrtf(f3_dot(v, v));
-	return f3_sc_mul(tmp, v);
-}
+} // namespace device

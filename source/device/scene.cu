@@ -92,12 +92,12 @@ namespace device::kernels {
 static __device__ bool sphere_hit(float &dist, float3 origin, float3 direction,
     float3 center, float radius)
 {
-	float3 oc = f3_sub(origin, center);
+	float3 oc = origin - center;
 
 	// Quadratic equation constants
-	float a = f3_dot(direction, direction);
-	float b = 2 * f3_dot(oc, direction);
-	float c = f3_dot(oc, oc) - radius * radius;
+	float a = dot(direction, direction);
+	float b = 2 * dot(oc, direction);
+	float c = dot(oc, oc) - radius * radius;
 
 	float discriminant = b * b - 4 * a * c;
 	if (discriminant < 0)
@@ -116,7 +116,7 @@ static __device__ float3 ray_direction(int x, int y, dim3 dims, float fov)
 	float u = (2 * (x + 0.5f) / dims.x - 1) * aspect * scale;
 	float v = (1 - 2 * (y + 0.5f) / dims.y) * scale;
 
-	return f3_norm(make_float3(u, v, -1.0f));
+	return normalize(make_float3(u, v, -1.0f));
 }
 
 #define NO_INTERSECTION ((size_t)(~0))
@@ -149,7 +149,7 @@ static __device__ size_t cast(float3 &n, float &d, SphereSetDescriptor *spheres,
 		}
 	}
 
-	n = f3_norm(f3_sub(cam, f3_add(cam, f3_sc_mul(min, ray))));
+	n = normalize(min * ray);
 	d = min;
 
 	return ret;
@@ -169,21 +169,9 @@ static __device__ size_t material_idx(SphereSetDescriptor *spheres, size_t idx)
  *
  * @return Reflected vector.
  */
-static __device__ float3 f3_reflect(float3 incident, float3 n)
+static __device__ float3 reflect(float3 incident, float3 n)
 {
-	return f3_sub(f3_sc_mul(2 * f3_dot(incident, n), n), incident);
-}
-
-static __device__ float clamp(float what, float lo, float up)
-{
-	return fmaxf(lo, fminf(what, up));
-}
-
-static __device__ float3 f3_clamp(float3 v, float lo, float up)
-{
-	return make_float3(clamp(v.x, lo, up),
-	    clamp(v.y, lo, up),
-	    clamp(v.z, lo, up));
+	return ((2 * dot(incident, n)) * n) - incident;
 }
 
 /**
@@ -200,7 +188,7 @@ static __device__ float3 f3_tone_map_and_correct(float3 rgb)
 	float g = powf(rgb.y / (1 + rgb.y), a);
 	float b = powf(rgb.z / (1 + rgb.z), a);
 
-	return f3_clamp(make_float3(r, g, b), 0, 1);
+	return clamp(make_float3(r, g, b), 0, 1);
 }
 
 /**
@@ -228,24 +216,24 @@ static __device__ void compute_color(float3 &rgb, float d, size_t mat,
 	float att = 1.0 / (1 + .2 * d);
 
 	// We are passed the ambient light constant in rgb already.
-	rgb = f3_cwise_mul(rgb, ka);
+	rgb = rgb * ka;
 
 	for (size_t i = 0; i < lights->count; ++i) {
-		float3 l  = f3_norm(f4_xyz(lights->locations[i]));
+		float3 l  = normalize(f4_xyz(lights->locations[i]));
 		float3 id = f4_xyz(lights->diffuses[i]);
 		float3 is = f4_xyz(lights->speculars[i]);
 
 		// Diffuse term
-		float  nl   = f3_dot(l, n);
-		float3 diff = f3_cwise_mul(id, f3_sc_mul(nl, kd));
+		float  nl   = dot(l, n);
+		float3 diff = id * (nl * kd);
 
 		// Specular term
-		float3 r    = f3_reflect(l, n);
-		float  rv   = fmaxf(0.f, f3_dot(r, cam));
-		float3 spec = f3_cwise_mul(is, f3_sc_mul(powf(rv, a), ks));
+		float3 r    = reflect(l, n);
+		float  rv   = fmaxf(0.f, dot(r, cam));
+		float3 spec = is * (powf(rv, a) * ks);
 
 		// Compute final (attenuated) color
-		rgb = f3_sc_mul(att, f3_add(rgb, f3_add(diff, spec)));
+		rgb = att * (rgb + diff + spec);
 	}
 }
 
