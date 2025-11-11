@@ -3,6 +3,7 @@
 
 #include <stdexcept>
 
+#include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_mouse.h>
 
 #include "host/appwindow.hxx"
@@ -103,6 +104,11 @@ void AppWindow::update()
 void AppWindow::close()
 {
 	running = false;
+}
+
+const u8 *AppWindow::get_kbd_state()
+{
+	return SDL_GetKeyboardState(nullptr);
 }
 
 } // namespace host

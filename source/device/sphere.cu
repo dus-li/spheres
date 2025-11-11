@@ -37,7 +37,7 @@ static std::array<float4, 3> gen_random_mat_consts(void)
 
 	float4 d = make_float4(dif(gen), dif(gen), dif(gen), 1.0);
 	float4 a = make_float4(amb(gen), amb(gen), amb(gen), 1.0);
-	float4 s = f4_sub(make_float4(1, 1, 1, 3), f4_add(d, a));
+	float4 s = make_float4(1, 1, 1, 3) - (d + a);
 
 	return { s, d, a };
 }

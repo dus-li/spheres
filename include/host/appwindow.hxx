@@ -101,6 +101,8 @@ class AppWindow {
 	void update();
 
 	void close();
+
+	const u8 *get_kbd_state();
 }; // class AppWindow
 
 } // namespace host

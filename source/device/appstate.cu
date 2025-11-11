@@ -4,6 +4,8 @@
 #include <exception>
 
 #include <SDL2/SDL_events.h>
+#include <SDL2/SDL_mouse.h>
+#include <SDL2/SDL_video.h>
 
 #include "device/appstate.cuh"
 #include "device/vecops.cuh"
@@ -12,6 +14,24 @@ const float mouse_sensitivity = 0.002;
 const float kbd_sensitivity   = 0.02;
 
 namespace device {
+
+void AppState::make_moves()
+{
+	CamBasis  basis = scene.cam.basis();
+	const u8 *kbd   = window.get_kbd_state();
+
+	if (kbd[SDL_SCANCODE_W])
+		scene.cam.move_by(kbd_sensitivity * basis[0]);
+
+	if (kbd[SDL_SCANCODE_S])
+		scene.cam.move_by(-kbd_sensitivity * basis[0]);
+
+	if (kbd[SDL_SCANCODE_A])
+		scene.cam.move_by(-kbd_sensitivity * basis[1]);
+
+	if (kbd[SDL_SCANCODE_D])
+		scene.cam.move_by(kbd_sensitivity * basis[1]);
+}
 
 AppState::AppState(size_t materials, size_t spheres, size_t lights, u32 width,
     u32 height, const char *title)
@@ -24,27 +44,10 @@ try
 {
 	scene.randomize();
 
-	// Moving camera & closing window
+	// Window closing
 	window.register_callback(SDL_KEYDOWN, [this](const SDL_Event &e) {
-		CamBasis basis = scene.cam.basis();
-
-		switch (e.key.keysym.sym) {
-		case SDLK_w:
-			scene.cam.move_by(kbd_sensitivity * basis[0]);
-			break;
-		case SDLK_s:
-			scene.cam.move_by(-kbd_sensitivity * basis[0]);
-			break;
-		case SDLK_a:
-			scene.cam.move_by(-kbd_sensitivity * basis[1]);
-			break;
-		case SDLK_d:
-			scene.cam.move_by(kbd_sensitivity * basis[1]);
-			break;
-		case SDLK_q:
+		if (e.key.keysym.sym == SDLK_q)
 			window.close();
-			break;
-		}
 	});
 
 	// Rotating camers
@@ -60,6 +63,7 @@ void AppState::run()
 {
 	try {
 		while (window.is_running()) {
+			make_moves();
 			window.handle_events();
 			scene.render_to(fb);
 			window.update();

@@ -19,6 +19,8 @@ class AppState {
 	Scene           scene;
 	host::AppWindow window;
 
+	void make_moves();
+
   public:
 	AppState(size_t materials, size_t spheres, size_t lights,
 	    u32 width = 1280, u32 height = 720, const char *title = "Spheres");
