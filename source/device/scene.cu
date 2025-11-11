@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: Dus'li
 
+#include <cmath>
 #include <exception>
 #include <float.h>
 #include <stdexcept>
@@ -34,23 +35,54 @@ namespace device::kernels {
  */
 static __global__ void render(uchar4 *fb, dim3 dims,
     MaterialSetDescriptor *mats, SphereSetDescriptor *spheres,
-    LightSetDescriptor *lights, float3 cam, float3 ambient);
+    LightSetDescriptor *lights, float3 cpos, CamBasis cam, float fov,
+    float3 ambient);
 
 } // namespace device::kernels
 
 namespace device {
 
+Camera::Camera(float3 location, float yaw, float pitch, float fov)
+    : location(location)
+    , yaw(yaw)
+    , pitch(pitch)
+    , fov(fov)
+{
+}
+
+void Camera::rotate_x(float rad)
+{
+	pitch += rad;
+}
+
+void Camera::rotate_y(float rad)
+{
+	yaw += rad;
+}
+
+void Camera::move_by(float3 v)
+{
+	location = location + v;
+}
+
+CamBasis Camera::basis()
+{
+	float3 fwd = make_float3(cosf(pitch) * sinf(yaw),
+	    sinf(pitch),
+	    -cosf(pitch) * cosf(yaw));
+
+	float3 right = make_float3(sinf(yaw - M_PI_2), 0, -cosf(yaw - M_PI_2));
+	float3 up    = cross(right, fwd);
+
+	return std::array<float3, 3> { fwd, right, up };
+}
+
 Scene::Scene(size_t material_count, size_t sphere_count, size_t light_count)
     : lights(light_count)
     , spheres(material_count, sphere_count)
+    , cam(make_float3(0, 0, 1.5), 0, 0, M_PI / 3)
 {
-	cam     = make_float3(0.0, 0.0, 1.5);
 	ambient = make_float3(0.1, 0.1, 0.1);
-}
-
-void Scene::reposition_cam(float3 where)
-{
-	cam = where;
 }
 
 void Scene::randomize()
@@ -75,7 +107,9 @@ void Scene::render_to(Framebuffer &fb)
 	    spheres.get_mdesc(),
 	    spheres.get_sdesc(),
 	    lights.get_desc(),
-	    cam,
+	    cam.location,
+	    cam.basis(),
+	    cam.fov,
 	    ambient);
 
 	cudaError_t tmp = cudaDeviceSynchronize();
@@ -107,16 +141,17 @@ static __device__ bool sphere_hit(float &dist, float3 origin, float3 direction,
 	return dist > 0.0;
 }
 
-static __device__ float3 ray_direction(int x, int y, dim3 dims, float fov)
+static __device__ float3 ray_direction(int x, int y, dim3 dims, float fov,
+    CamBasis cam)
 {
 	float aspect = (float)dims.x / (float)dims.y;
 	float scale  = tanf(fov / 2);
 
 	// Compute NDCs
-	float u = (2 * (x + 0.5f) / dims.x - 1) * aspect * scale;
-	float v = (1 - 2 * (y + 0.5f) / dims.y) * scale;
+	float u = 2 * ((x + 0.5f) / dims.x - 0.5f) * aspect * scale;
+	float v = 2 * ((y + 0.5f) / dims.y - 0.5f) * scale;
 
-	return normalize(make_float3(u, v, -1.0f));
+	return normalize(u * cam[1] + v * cam[2] + cam[0]);
 }
 
 #define NO_INTERSECTION ((size_t)(~0))
@@ -240,7 +275,8 @@ static __device__ void compute_color(float3 &rgb, float d, size_t mat,
 // Doxygen doc comment is near the top of the file.
 static __global__ void render(uchar4 *fb, dim3 dims,
     MaterialSetDescriptor *mats, SphereSetDescriptor *spheres,
-    LightSetDescriptor *lights, float3 cam, float3 ambient)
+    LightSetDescriptor *lights, float3 cpos, CamBasis cam, float fov,
+    float3 ambient)
 {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -253,15 +289,15 @@ static __global__ void render(uchar4 *fb, dim3 dims,
 	float3 n; // Surface normal at the ray intersection point.
 
 	// Find first sphere that the ray hits (naively, and suboptimally)
-	float3 ray = ray_direction(x, y, dims, PI_OVER_2);
-	size_t idx = cast(n, d, spheres, cam, ray);
+	float3 ray = ray_direction(x, y, dims, fov, cam);
+	size_t idx = cast(n, d, spheres, cpos, ray);
 
 	// Retrieve index of a material that was hit by the ray.
 	size_t mat = material_idx(spheres, idx);
 
 	float3 rgb = ambient;
 	if (mat != NO_INTERSECTION)
-		compute_color(rgb, d, mat, mats, lights, n, cam);
+		compute_color(rgb, d, mat, mats, lights, n, cpos);
 
 	// Not strictly in Phong model, but makes the result prettier.
 	rgb = f3_tone_map_and_correct(rgb);

@@ -160,4 +160,11 @@ static inline call_any__ float3 f4_xyz(float4 v)
 	return make_float3(v.x, v.y, v.z);
 }
 
+static inline call_any__ float3 cross(float3 lhs, float3 rhs)
+{
+	return make_float3(lhs.y * rhs.z - lhs.z * rhs.y,
+	    lhs.z * rhs.x - lhs.x * rhs.z,
+	    lhs.x * rhs.y - lhs.y * rhs.x);
+}
+
 } // namespace device

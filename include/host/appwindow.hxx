@@ -3,8 +3,10 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <SDL2/SDL.h>
@@ -50,6 +52,8 @@ using Buffer         = std::vector<u32> &;
 
 /** An application window class. */
 class AppWindow {
+	using EventCb = std::function<void(const SDL_Event &)>;
+
 	unsigned       width;    ///< Width of the window.
 	unsigned       height;   ///< Height of the window.
 	string         name;     ///< Title of the window.
@@ -58,6 +62,9 @@ class AppWindow {
 	UniqueWindow   window;   ///< SDL window.
 	UniqueRenderer renderer; ///< SDL renderer.
 	UniqueTexture  texture;  ///< SDL texture displayed by renderer.
+
+	/** Collection of callbacks for SDL window events. */
+	std::unordered_map<u32, std::vector<EventCb>> callbacks;
 
   public:
 	/**
@@ -73,6 +80,13 @@ class AppWindow {
 	~AppWindow();
 
 	/**
+	 * Register a callback for a window event.
+	 * @param type Type of event to run the callback for.
+	 * @param cb   Callback function.
+	 */
+	void register_callback(u32 type, EventCb cb);
+
+	/**
 	 * Check whether the application has been closed.
 	 *
 	 * @return @a false If the application was closed.
@@ -85,6 +99,8 @@ class AppWindow {
 
 	/** Update displayed window with contents of the framebuffer. */
 	void update();
+
+	void close();
 }; // class AppWindow
 
 } // namespace host

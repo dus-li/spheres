@@ -13,7 +13,7 @@ DIR_SOURCE_DEVICE := $(DIR_SOURCE)/device
 DIR_BUILD         := build
 
 CXXFLAGS  := -O2 -Wall -Wextra -std=c++17 -I$(DIR_INCLUDE)
-NVCCFLAGS := -O2 -I$(DIR_INCLUDE) --extended-lambda
+NVCCFLAGS := -O2 -I$(DIR_INCLUDE) --extended-lambda --expt-relaxed-constexpr
 NVCCFLAGS += --compiler-options '-fPIC -Wall -Wextra'
 LDFLAGS   := $(shell sdl2-config --cflags --libs)
 

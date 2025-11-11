@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
 
 #include "device/framebuffer.cuh"
@@ -11,18 +12,34 @@
 
 namespace device {
 
+using CamBasis = std::array<float3, 3>;
+
+class Camera {
+	friend class Scene;
+
+	float3 location;
+	float  yaw;
+	float  pitch;
+	float  fov;
+
+  public:
+	Camera(float3 location, float yaw, float pitch, float fov);
+	void     rotate_y(float rad);
+	void     rotate_x(float rad);
+	void     move_by(float3 v);
+	CamBasis basis();
+};
+
 /** Complete set of information necessary to render a scene. */
 class Scene {
 	Lights  lights;
 	Spheres spheres;
-	float3  cam;     ///< Camera location.
 	float3  ambient; ///< Ambient light constant.
 
   public:
-	Scene(size_t material_count, size_t sphere_count, size_t light_count);
+	Camera cam;
 
-	/** Place the camera at a new location. */
-	void reposition_cam(float3 where);
+	Scene(size_t material_count, size_t sphere_count, size_t light_count);
 
 	/** Randomize all scene components. */
 	void randomize();

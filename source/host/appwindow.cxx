@@ -3,6 +3,8 @@
 
 #include <stdexcept>
 
+#include <SDL2/SDL_mouse.h>
+
 #include "host/appwindow.hxx"
 
 namespace host {
@@ -56,11 +58,18 @@ AppWindow::AppWindow(string name, unsigned width, unsigned height, Buffer buf)
 	    height));
 	if (!texture)
 		throw std::runtime_error("Failed to create a texture");
+
+	SDL_SetRelativeMouseMode(SDL_TRUE);
 }
 
 AppWindow::~AppWindow()
 {
 	SDL_Quit();
+}
+
+void AppWindow::register_callback(u32 type, EventCb cb)
+{
+	callbacks[type].push_back(std::move(cb));
 }
 
 bool AppWindow::is_running()
@@ -75,6 +84,9 @@ void AppWindow::handle_events()
 	while (SDL_PollEvent(&e)) {
 		if (e.type == SDL_QUIT)
 			running = false;
+
+		for (EventCb &cb : callbacks[e.type])
+			cb(e);
 	}
 }
 
@@ -86,6 +98,11 @@ void AppWindow::update()
 	SDL_RenderClear(renderer.get());
 	SDL_RenderCopy(renderer.get(), texture.get(), nullptr, nullptr);
 	SDL_RenderPresent(renderer.get());
+}
+
+void AppWindow::close()
+{
+	running = false;
 }
 
 } // namespace host
