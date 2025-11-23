@@ -54,13 +54,13 @@ IncludeCategories:
   - Regex: '^<SDL2/.*>'
     Priority: 2
     SortPriority: 20
-  - Regex: '^"host/.*\.hxx'
+  - Regex: '^"host/.*\.(hxx|h)'
     Priority: 3
     SortPriority: 30
   - Regex: '^"device/.*\.cuh'
     Priority: 4
     SortPriority: 40
-  - Regex: '^".*\.hxx'
+  - Regex: '^".*\.(hxx|h)'
     Priority: 5
     SortPriority: 50
 IncludeIsMainRegex: 'NOTHING_AKJSDHFKJAHD87F6A8S70DUHAKJSNBDVASDJHFAUISHF'
