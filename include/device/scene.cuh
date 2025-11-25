@@ -44,7 +44,10 @@ class Scene {
 	/** Randomize all scene components. */
 	void randomize();
 
-	/** Raycast and render the scene to a framebuffer. */
+	/**
+	 * Raycast and render the scene to a framebuffer.
+	 * @param fb Target framebuffer.
+	 */
 	void render_to(Framebuffer &fb);
 };
 

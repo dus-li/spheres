@@ -4,10 +4,22 @@
 
 set -euo pipefail
 
-SOURCES=$(git diff --cached --name-only | grep -E '\.(cxx|cu|hxx|cuh|tpp)' || true)
 FAILED=0
+SOURCES=$(git diff --cached --name-only | grep -E '\.(cxx|cu|hxx|cuh|tpp)' || true)
 
-reuse lint || FAILED=1
+for file in $(git diff --cached --name-only); do
+	if [ ! -e "${file}" ]; then
+		continue
+	fi
+
+	reuse lint-file "${file}" || FAILED=1
+done
+
+if [ "${FAILED}" == "1" ]; then
+	echo
+	echo "Please address the licensing issues"
+	exit 1
+fi
 
 for file in ${SOURCES}; do
 	# File was removed

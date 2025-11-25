@@ -41,6 +41,11 @@ class Framebuffer {
 	void sync();
 
 	dim3 get_dims();
+
+	void   h_put_pixel(size_t x, size_t y, u32 color);
+	void   h_put_pixel(size_t x, size_t y, uchar4 color);
+	uchar4 h_get_pixel(size_t x, size_t y);
+	void   h_text(size_t x, size_t y, const std::string &txt, uchar4 color);
 };
 
 } // namespace device

@@ -2,10 +2,13 @@
 // SPDX-FileCopyrightText: Dus'li
 
 #include <exception>
+#include <string>
+#include <thread>
 
-#include <SDL2/SDL_events.h>
 #include <SDL2/SDL_mouse.h>
 #include <SDL2/SDL_video.h>
+
+#include "host/time.hxx"
 
 #include "device/appstate.cuh"
 #include "device/vecops.cuh"
@@ -31,6 +34,18 @@ void AppState::make_moves()
 
 	if (kbd[SDL_SCANCODE_D])
 		scene.cam.move_by(kbd_sensitivity * basis[1]);
+}
+
+void AppState::render_fps(int fps)
+{
+	static const uchar4 green = make_rgba(0, 0xFF, 0, 0xFF);
+
+	std::string text = "FPS: ";
+
+	if (fps != 0)
+		text += std::to_string(fps);
+
+	fb.h_text(20, 40, text, green);
 }
 
 AppState::AppState(size_t materials, size_t spheres, size_t lights, u32 width,
@@ -61,13 +76,20 @@ try
 
 void AppState::run()
 {
+	static const int TARGET_FPS = 60;
+	host::FPSLimiter limit(TARGET_FPS);
+
 	try {
 		while (window.is_running()) {
 			make_moves();
 			window.handle_events();
 			scene.render_to(fb);
+
+			int elapsed = limit.wait();
+			int fps     = elapsed ? 1000 / elapsed : 0;
+
+			render_fps(fps);
 			window.update();
-			SDL_Delay(16);
 		}
 	} catch (const std::exception &e) {
 		throw;

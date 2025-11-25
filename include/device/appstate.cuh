@@ -20,6 +20,7 @@ class AppState {
 	host::AppWindow window;
 
 	void make_moves();
+	void render_fps(int fps);
 
   public:
 	AppState(size_t materials, size_t spheres, size_t lights,
