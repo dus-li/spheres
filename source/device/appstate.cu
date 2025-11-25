@@ -34,6 +34,12 @@ void AppState::make_moves()
 
 	if (kbd[SDL_SCANCODE_D])
 		scene.cam.move_by(kbd_sensitivity * basis[1]);
+
+	if (kbd[SDL_SCANCODE_LSHIFT])
+		scene.cam.move_by(kbd_sensitivity * basis[2]);
+
+	if (kbd[SDL_SCANCODE_SPACE])
+		scene.cam.move_by(-kbd_sensitivity * basis[2]);
 }
 
 void AppState::render_fps(int fps)
