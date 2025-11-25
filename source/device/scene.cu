@@ -172,11 +172,13 @@ static __device__ size_t cast(float3 &n, float &d, SphereSetDescriptor *spheres,
 {
 	float  min = FLT_MAX;
 	size_t ret = NO_INTERSECTION;
+	float3 center;
 
 	for (size_t i = 0; i < spheres->count; ++i) {
-		float3 center = f4_xyz(spheres->centers[i]);
-		float  radius = spheres->radiuses[i];
-		float  dist;
+		center = f4_xyz(__ldg(&spheres->centers[i]));
+
+		float radius = __ldg(&spheres->radiuses[i]);
+		float dist;
 
 		if (sphere_hit(dist, cam, ray, center, radius) && dist < min) {
 			min = dist;
@@ -184,13 +186,11 @@ static __device__ size_t cast(float3 &n, float &d, SphereSetDescriptor *spheres,
 		}
 	}
 
-	n = normalize(min * ray);
+	n = normalize((cam + min * ray) - center);
 	d = min;
 
 	return ret;
 }
-
-#define PI_OVER_2 (1.57f) // roughly
 
 static __device__ size_t material_idx(SphereSetDescriptor *spheres, size_t idx)
 {
