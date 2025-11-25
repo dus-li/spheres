@@ -9,7 +9,7 @@
 int main()
 {
 	try {
-		device::AppState app(5, 20, 1);
+		device::AppState app(5, 1000, 10);
 		app.run();
 	} catch (const std::exception &e) {
 		std::cerr << "Error: " << e.what() << std::endl;

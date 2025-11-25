@@ -93,7 +93,7 @@ void SphereSet::randomize(size_t material_count)
 {
 	try {
 		rand_fill_float4_0(centers.get(), count, -0.5f, 0.5f);
-		rand_fill_float(radiuses.get(), count, 0.05f, 0.1f);
+		rand_fill_float(radiuses.get(), count, 0.005f, 0.03f);
 		rand_fill_size_t(materials.get(), count, 0, material_count);
 	} catch (const std::exception &e) {
 		throw;
