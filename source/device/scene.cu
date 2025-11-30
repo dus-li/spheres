@@ -164,6 +164,7 @@ static __device__ float3 ray_direction(int x, int y, dim3 dims, float fov,
 
 /**
  * Cast a ray and find first sphere intersection.
+ * @param p       Hit point.
  * @param n       Output, surface normal at the intersection point.
  * @param d       Output, distance from the camera.
  * @param spheres Descriptor of the spheres present in the scene.
@@ -173,8 +174,8 @@ static __device__ float3 ray_direction(int x, int y, dim3 dims, float fov,
  * @return @a NO_INTERSECTION if no sphere is on the way.
  * @return Index of the first intersected sphere.
  */
-static __device__ size_t cast(float3 &n, float &d, SphereSetDescriptor *spheres,
-    float3 cam, float3 ray)
+static __device__ size_t cast(float3 &p, float3 &n, float &d,
+    SphereSetDescriptor *spheres, float3 cam, float3 ray)
 {
 	float  min = FLT_MAX;
 	size_t ret = NO_INTERSECTION;
@@ -194,7 +195,8 @@ static __device__ size_t cast(float3 &n, float &d, SphereSetDescriptor *spheres,
 		}
 	}
 
-	n = normalize((cam + min * ray) - min_center);
+	p = cam + min * ray;
+	n = normalize(p - min_center);
 	d = min;
 
 	return ret;
@@ -237,6 +239,7 @@ static __device__ float3 f3_tone_map_and_correct(float3 rgb)
 /**
  * Compute a color of a pixel using Phong equation for point illumination.
  * @param rgb    Ambient light of the scene. Output is placed here as well.
+ * @param p      Hit point.
  * @param d      Distance from the camera.
  * @param mat    Index of the material appropriate for this pixel.
  * @param mats   Descriptors of materials used by spheres in the scene.
@@ -246,38 +249,44 @@ static __device__ float3 f3_tone_map_and_correct(float3 rgb)
  *
  * Apart from running the Phong formula this also slightly attenuates light.
  */
-static __device__ void compute_color(float3 &rgb, float d, size_t mat,
+static __device__ void compute_color(float3 &rgb, float3 p, float d, size_t mat,
     MaterialSetDescriptor *mats, LightSetDescriptor *lights, float3 n,
     float3 cam)
 {
+	float3 v = normalize(cam - p);
+
 	float3 ka = f4_xyz(mats->ambients[mat]);
 	float3 kd = f4_xyz(mats->diffuses[mat]);
 	float3 ks = f4_xyz(mats->speculars[mat]);
 	float  a  = mats->shininess[mat];
 
-	// Light attenuation (Not strictly in Phong, but result is prettier.)
-	float att = 1.0 / (1 + .2 * d);
-
-	// We are passed the ambient light constant in rgb already.
-	rgb = rgb * ka;
+	float3 color = rgb * ka;
 
 	for (size_t i = 0; i < lights->count; ++i) {
-		float3 l  = normalize(f4_xyz(lights->locations[i]));
+		float3 l  = normalize(f4_xyz(lights->locations[i]) - p);
 		float3 id = f4_xyz(lights->diffuses[i]);
 		float3 is = f4_xyz(lights->speculars[i]);
 
+		float dist = sqrtf(dot(l, l));
+		l          = l / dist;
+
+		// Light attenuation (not in Phong, but makes it prettier.)
+		float att = 1.0f / (1.0f + 0.1f * dist + 0.02 * dist * dist);
+
 		// Diffuse term
-		float  nl   = dot(l, n);
+		float  nl   = fmaxf(0.0, dot(l, n));
 		float3 diff = id * (nl * kd);
 
 		// Specular term
-		float3 r    = reflect(l, n);
-		float  rv   = fmaxf(0.f, dot(r, cam));
+		float3 r    = reflect(make_float3(0, 0, 0) - l, n);
+		float  rv   = fmaxf(0.f, dot(r, v));
 		float3 spec = is * (powf(rv, a) * ks);
 
 		// Compute final (attenuated) color
-		rgb = att * (rgb + diff + spec);
+		color = color + att * (diff + spec);
 	}
+
+	rgb = color;
 }
 
 // Doxygen doc comment is near the top of the file.
@@ -295,17 +304,18 @@ static __global__ void render(uchar4 *fb, dim3 dims,
 
 	float  d; // Distance of ray intersection point from the camera.
 	float3 n; // Surface normal at the ray intersection point.
+	float3 p; // Point where ray hits the surface.
 
 	// Find first sphere that the ray hits (naively, and suboptimally)
 	float3 ray = ray_direction(x, y, dims, fov, cam);
-	size_t idx = cast(n, d, spheres, cpos, ray);
+	size_t idx = cast(p, n, d, spheres, cpos, ray);
 
 	// Retrieve index of a material that was hit by the ray.
 	size_t mat = material_idx(spheres, idx);
 
 	float3 rgb = ambient;
 	if (mat != NO_INTERSECTION)
-		compute_color(rgb, d, mat, mats, lights, n, cpos);
+		compute_color(rgb, p, d, mat, mats, lights, n, cpos);
 
 	// Not strictly in Phong model, but makes the result prettier.
 	rgb = f3_tone_map_and_correct(rgb);
