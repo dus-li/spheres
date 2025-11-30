@@ -41,7 +41,13 @@ class Scene {
 
 	Scene(size_t material_count, size_t sphere_count, size_t light_count);
 
-	/** Randomize all scene components. */
+	/**
+	 * Randomize all scene components.
+	 *
+	 * Note that some elements may be randomized prior to a call to this
+	 * method. What executing it accomplishes is a guarantee that all the
+	 * scene components are ready for rendering.
+	 */
 	void randomize();
 
 	/**

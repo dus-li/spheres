@@ -21,15 +21,40 @@ struct MaterialSet {
 	void randomize();
 };
 
-/** Structure of arrays containing sphere parameters. */
+/**
+ * Structure of arrays containing sphere parameters, kept in host memory.
+ *
+ * There also exists @ref SphereSet which keeps the same data in GPU memory.
+ * The justification for existance of two separate structs with the same
+ * contents is that we need to preserve sphere data in main memory for a little
+ * longer in order to enable building an Octree. The flow is as follows:
+ *
+ *   1. Spheres are initialized on host.
+ *   2. Resulting instance of a HostSphereSet is used for Octree initialization.
+ *   3. The same instance is used for creation of an instance of @ref SphereSet.
+ *   4. The host-side instance's resources are freed.
+ */
+struct HostSphereSet {
+	std::vector<float4> centers;   ///< Sphere centers.
+	std::vector<float>  radiuses;  ///< Radiuses of the spheres.
+	std::vector<size_t> materials; ///< Indices to a @ref MaterialSet.
+	size_t              count;     ///< Number of elements.
+
+	HostSphereSet(size_t count);
+	void randomize(size_t material_count);
+};
+
+/**
+ * A device-side counterpart to @ref HostSphereSet.
+ * @see HostSphereSet
+ */
 struct SphereSet {
 	unique_cuda<float4> centers;   ///< Sphere centers.
 	unique_cuda<float>  radiuses;  ///< Radiuses of the spheres.
 	unique_cuda<size_t> materials; ///< Indices to a @ref MaterialSet.
 	size_t              count;     ///< Number of elements.
 
-	SphereSet(size_t count);
-	void randomize(size_t material_count);
+	SphereSet(const HostSphereSet &set);
 };
 
 /**
@@ -58,8 +83,8 @@ struct SphereSetDescriptor {
 
 /** Complete set of information about spheres present in the scene. */
 class Spheres {
-	MaterialSet materials;
-	SphereSet   spheres;
+	MaterialSet                materials;
+	std::unique_ptr<SphereSet> spheres;
 
 	// Cached entries passed to kernels.
 	unique_cuda<MaterialSetDescriptor> mdesc;
@@ -70,9 +95,6 @@ class Spheres {
 
   public:
 	Spheres(size_t material_count, size_t sphere_count);
-
-	/** Populate sphere and material structures with random data. */
-	void randomize();
 
 	/**
 	 * Obtain a descriptor of materials usable in CUDA kernels.

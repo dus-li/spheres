@@ -3,6 +3,7 @@
 
 #include <exception>
 #include <iostream>
+#include <memory>
 #include <random>
 #include <ranges>
 #include <stdexcept>
@@ -43,7 +44,7 @@ static std::array<float4, 3> gen_random_mat_consts(void)
 }
 
 /** Host to device CUDA memcpy. */
-static inline int __htod_cpy(void *to, void *from, size_t n)
+static inline int __htod_cpy(void *to, const void *from, size_t n)
 {
 	return cudaSuccess != cudaMemcpy(to, from, n, cudaMemcpyHostToDevice);
 }
@@ -77,8 +78,38 @@ void MaterialSet::randomize()
 	}
 }
 
-SphereSet::SphereSet(size_t count)
+HostSphereSet::HostSphereSet(size_t count)
     : count(count)
+    , centers(count)
+    , radiuses(count)
+    , materials(count)
+{
+}
+
+void HostSphereSet::randomize(size_t material_count)
+{
+	std::random_device rd;
+	std::mt19937       gen(rd());
+
+	std::uniform_real_distribution<float> center(-0.5, 0.5);
+	std::uniform_real_distribution<float> radius(0.005, 0.03);
+	std::uniform_int_distribution<size_t> material(0, material_count - 1);
+
+	std::generate(centers.begin(), centers.end(), [&gen, &center]() {
+		return make_float4(center(gen), center(gen), center(gen), 0.0);
+	});
+
+	std::generate(radiuses.begin(), radiuses.end(), [&gen, &radius]() {
+		return radius(gen);
+	});
+
+	std::generate(materials.begin(), materials.end(), [&gen, &material]() {
+		return material(gen);
+	});
+}
+
+SphereSet::SphereSet(const HostSphereSet &set)
+    : count(set.count)
 {
 	try {
 		centers   = make_unique_cuda<float4>(count);
@@ -87,38 +118,37 @@ SphereSet::SphereSet(size_t count)
 	} catch (const std::exception &e) {
 		throw;
 	}
-}
 
-void SphereSet::randomize(size_t material_count)
-{
-	try {
-		rand_fill_float4_0(centers.get(), count, -0.5f, 0.5f);
-		rand_fill_float(radiuses.get(), count, 0.005f, 0.03f);
-		rand_fill_size_t(materials.get(), count, 0, material_count);
-	} catch (const std::exception &e) {
-		throw;
-	}
+	size_t csz = count * sizeof(float4);
+	size_t rsz = count * sizeof(float);
+	size_t msz = count * sizeof(size_t);
+
+	int ret = __htod_cpy(centers.get(), set.centers.data(), csz) ?:
+	    __htod_cpy(radiuses.get(), set.radiuses.data(), rsz)     ?:
+	    __htod_cpy(materials.get(), set.materials.data(), msz);
+	if (ret)
+		throw rand_err_cons(-RAND_ERR_COPY);
 }
 
 Spheres::Spheres(size_t material_count, size_t sphere_count)
     : materials(material_count)
-    , spheres(sphere_count)
 {
 	try {
 		mdesc = make_unique_cuda<MaterialSetDescriptor>(1);
 		sdesc = make_unique_cuda<SphereSetDescriptor>(1);
+
+		HostSphereSet hset(sphere_count);
+
+		materials.randomize();
+		hset.randomize(material_count);
+
+		spheres = std::make_unique<SphereSet>(hset);
 
 		init_mdesc();
 		init_sdesc();
 	} catch (const std::exception &e) {
 		throw;
 	}
-}
-
-void Spheres::randomize()
-{
-	materials.randomize();
-	spheres.randomize(materials.count);
 }
 
 void Spheres::init_mdesc()
@@ -140,10 +170,10 @@ void Spheres::init_mdesc()
 void Spheres::init_sdesc()
 {
 	SphereSetDescriptor tmp = { /**/
-		.centers   = spheres.centers.get(),
-		.radiuses  = spheres.radiuses.get(),
-		.materials = spheres.materials.get(),
-		.count     = spheres.count
+		.centers   = spheres->centers.get(),
+		.radiuses  = spheres->radiuses.get(),
+		.materials = spheres->materials.get(),
+		.count     = spheres->count
 	};
 
 	cudaError_t rv;

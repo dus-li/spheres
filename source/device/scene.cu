@@ -89,7 +89,6 @@ void Scene::randomize()
 {
 	try {
 		lights.randomize();
-		spheres.randomize();
 	} catch (const std::exception &e) {
 		throw;
 	}
