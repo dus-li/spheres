@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "device/octree.cuh"
 #include "device/randomizer.cuh"
 #include "device/sphere.cuh"
 #include "device/vecops.cuh"
@@ -153,11 +154,13 @@ Spheres::Spheres(size_t material_count, size_t sphere_count)
 		sdesc = make_unique_cuda<SphereSetDescriptor>(1);
 
 		HostSphereSet hset(sphere_count);
+		Octree        octree(hset, HostSphereSet::scene_bounds());
 
 		materials.randomize();
 		hset.randomize(material_count);
 
 		spheres = std::make_unique<SphereSet>(hset);
+		tree    = octree.flatten();
 
 		init_mdesc();
 		init_sdesc();

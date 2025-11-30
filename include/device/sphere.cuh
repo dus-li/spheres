@@ -10,6 +10,8 @@
 
 namespace device {
 
+struct FlattenedOctree;
+
 /** Structure of arrays containing material parameters. */
 struct MaterialSet {
 	unique_cuda<float4> speculars; ///< Specular reflection constants.
@@ -92,8 +94,9 @@ struct SphereSetDescriptor {
 
 /** Complete set of information about spheres present in the scene. */
 class Spheres {
-	MaterialSet                materials;
-	std::unique_ptr<SphereSet> spheres;
+	MaterialSet                  materials;
+	std::unique_ptr<SphereSet>   spheres;
+	unique_cuda<FlattenedOctree> tree;
 
 	// Cached entries passed to kernels.
 	unique_cuda<MaterialSetDescriptor> mdesc;
