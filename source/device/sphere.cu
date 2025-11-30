@@ -78,6 +78,21 @@ void MaterialSet::randomize()
 	}
 }
 
+static constexpr inline float3 make_cfloat3(float x, float y, float z)
+{
+	float3 ret = { .x = x, .y = y, .z = z };
+
+	return ret;
+}
+
+constexpr AABB HostSphereSet::scene_bounds()
+{
+	float lo = CENTERS_LO - RADIUSES_UP;
+	float up = CENTERS_UP + RADIUSES_UP;
+
+	return AABB(make_cfloat3(lo, lo, lo), make_cfloat3(up, up, up));
+}
+
 HostSphereSet::HostSphereSet(size_t count)
     : count(count)
     , centers(count)
@@ -91,8 +106,8 @@ void HostSphereSet::randomize(size_t material_count)
 	std::random_device rd;
 	std::mt19937       gen(rd());
 
-	std::uniform_real_distribution<float> center(-0.5, 0.5);
-	std::uniform_real_distribution<float> radius(0.005, 0.03);
+	std::uniform_real_distribution<float> center(CENTERS_LO, CENTERS_UP);
+	std::uniform_real_distribution<float> radius(RADIUSES_LO, RADIUSES_UP);
 	std::uniform_int_distribution<size_t> material(0, material_count - 1);
 
 	std::generate(centers.begin(), centers.end(), [&gen, &center]() {

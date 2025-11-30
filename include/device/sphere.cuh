@@ -5,6 +5,7 @@
 
 #include <cstddef>
 
+#include "device/aabb.cuh"
 #include "device/unique.cuh"
 
 namespace device {
@@ -35,10 +36,18 @@ struct MaterialSet {
  *   4. The host-side instance's resources are freed.
  */
 struct HostSphereSet {
+	static constexpr float CENTERS_LO  = -0.5;
+	static constexpr float CENTERS_UP  = 0.5;
+	static constexpr float RADIUSES_LO = 0.005;
+	static constexpr float RADIUSES_UP = 0.03;
+
 	std::vector<float4> centers;   ///< Sphere centers.
 	std::vector<float>  radiuses;  ///< Radiuses of the spheres.
 	std::vector<size_t> materials; ///< Indices to a @ref MaterialSet.
 	size_t              count;     ///< Number of elements.
+
+	/** Compute vertices of bounding box limiting the scene. */
+	static constexpr AABB scene_bounds();
 
 	HostSphereSet(size_t count);
 	void randomize(size_t material_count);
