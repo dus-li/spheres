@@ -207,7 +207,7 @@ static __device__ size_t material_idx(SphereSetDescriptor *spheres, size_t idx)
  */
 static __device__ float3 reflect(float3 incident, float3 n)
 {
-	return ((2 * dot(incident, n)) * n) - incident;
+	return incident - ((2 * dot(incident, n)) * n);
 }
 
 /**
