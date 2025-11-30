@@ -56,8 +56,8 @@ void Lights::randomize()
 {
 	try {
 		rand_fill_light_loc(locations.get(), count, -2.0f, 2.0f);
-		rand_fill_float4(diffuses.get(), count, 0.3f, 0.8f);
-		rand_fill_float4(speculars.get(), count, 0.1f, 0.3f);
+		rand_fill_float4(diffuses.get(), count, 1.0f, 1.8f);
+		rand_fill_float4(speculars.get(), count, 0.5f, 0.8f);
 	} catch (const std::exception &e) {
 		throw;
 	}
