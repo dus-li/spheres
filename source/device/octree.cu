@@ -80,10 +80,143 @@ Octree::Octree(const HostSphereSet &spheres, const AABB &box)
 {
 }
 
+/** Host-side equivalent to @ref FlattenedOctree. */
+struct FlattenedOctreeHost {
+	// Bounding boxes' vertices coordinates.
+	std::vector<float> aabb_lo_xs;
+	std::vector<float> aabb_up_xs;
+	std::vector<float> aabb_lo_ys;
+	std::vector<float> aabb_up_ys;
+	std::vector<float> aabb_lo_zs;
+	std::vector<float> aabb_up_zs;
+
+	// Indices of child nodes.
+	std::array<std::vector<size_t>, 8> children;
+
+	/// Concatenation of all leaf sphere index vectors.
+	std::vector<size_t> leaf_indices;
+
+	std::vector<size_t> leaf_bases; ///< Indices into leaf_indices.
+	std::vector<size_t> leaf_sizes; ///< Popcounts of leaf_indices.
+
+	std::vector<size_t> is_leaf;
+
+	size_t size() const { return aabb_lo_xs.size(); }
+
+	unique_cuda<FlattenedOctree> to_device();
+};
+
+template <typename T>
+static inline void try_copy(T *dest, const T *src, size_t n)
+{
+	if (cudaMemcpy(dest, src, n, cudaMemcpyHostToDevice) != cudaSuccess)
+		throw std::runtime_error("Failed to copy to device");
+}
+
+template <typename T>
+static inline unique_cuda<T> try_clone(const std::vector<T> &src)
+{
+	size_t size = sizeof(T) * src.size();
+
+	try {
+		unique_cuda<T> ret = make_unique_cuda<T>(src.size());
+		try_copy(ret.get(), src.data(), size);
+
+		return ret;
+	} catch (const std::exception &e) {
+		throw;
+	}
+}
+
+unique_cuda<FlattenedOctree> FlattenedOctreeHost::to_device()
+{
+	FlattenedOctree tmp;
+
+	try {
+		// Bounding boxes
+		tmp.aabb_lo_xs = try_clone(aabb_lo_xs);
+		tmp.aabb_up_xs = try_clone(aabb_up_xs);
+		tmp.aabb_lo_ys = try_clone(aabb_lo_ys);
+		tmp.aabb_up_ys = try_clone(aabb_up_ys);
+		tmp.aabb_lo_zs = try_clone(aabb_lo_zs);
+		tmp.aabb_up_zs = try_clone(aabb_up_zs);
+
+		// Children
+		tmp.children_0 = try_clone(children[0]);
+		tmp.children_1 = try_clone(children[1]);
+		tmp.children_2 = try_clone(children[2]);
+		tmp.children_3 = try_clone(children[3]);
+		tmp.children_4 = try_clone(children[4]);
+		tmp.children_5 = try_clone(children[5]);
+		tmp.children_6 = try_clone(children[6]);
+		tmp.children_7 = try_clone(children[7]);
+
+		// Leaf info
+		tmp.leaf_indices = try_clone(leaf_indices);
+		tmp.leaf_bases   = try_clone(leaf_bases);
+		tmp.leaf_sizes   = try_clone(leaf_sizes);
+		tmp.is_leaf      = try_clone(is_leaf);
+
+		// Put it together
+		auto ret = make_unique_cuda<FlattenedOctree>(1);
+		try_copy(ret.get(), &tmp, sizeof(FlattenedOctree));
+		return ret;
+	} catch (const std::exception &e) {
+		throw;
+	}
+}
+
+size_t Octree::push_node(FlattenedOctreeHost &out)
+{
+	const size_t SIZE_MAX = std::numeric_limits<size_t>::max();
+
+	size_t outidx = out.size();
+
+	// AABB
+	out.aabb_lo_xs.push_back(aabb.lo.x);
+	out.aabb_up_xs.push_back(aabb.up.x);
+	out.aabb_lo_ys.push_back(aabb.lo.y);
+	out.aabb_up_ys.push_back(aabb.up.y);
+	out.aabb_lo_zs.push_back(aabb.lo.z);
+	out.aabb_up_zs.push_back(aabb.up.z);
+
+	// Initialize children to a known sentinel value.
+	std::for_each(out.children.begin(),
+	    out.children.end(),
+	    [&SIZE_MAX](auto &v) { v.push_back(SIZE_MAX); });
+
+	out.leaf_bases.push_back(SIZE_MAX);
+	out.leaf_sizes.push_back(0);
+	out.is_leaf.push_back(leaf);
+
+	// If we are a leaf - cat out nodes to leaf_bases and return.
+	if (leaf) {
+		size_t fst = out.leaf_indices.size();
+		for (size_t i : idx)
+			out.leaf_indices.push_back(i);
+
+		out.leaf_bases[outidx] = fst;
+		out.leaf_sizes[outidx] = idx.size();
+
+		return outidx;
+	}
+
+	for (size_t i = 0; i < 8; ++i) {
+		if (link[i] == nullptr)
+			continue;
+
+		out.children[i][outidx] = link[i]->push_node(out);
+	}
+
+	return outidx;
+}
+
 unique_cuda<FlattenedOctree> Octree::flatten()
 {
-	// TODO
-	return nullptr;
+	FlattenedOctreeHost tmp;
+	push_node(tmp);
+
+	return tmp.to_device();
 }
 
 } // namespace device

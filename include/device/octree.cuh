@@ -16,7 +16,38 @@ namespace device {
  * A device-allocated octree SoA.
  * @see Octree
  */
-struct FlattenedOctree { };
+struct FlattenedOctree {
+	// Bounding boxes' vertices coordinates.
+	unique_cuda<float> aabb_lo_xs;
+	unique_cuda<float> aabb_up_xs;
+	unique_cuda<float> aabb_lo_ys;
+	unique_cuda<float> aabb_up_ys;
+	unique_cuda<float> aabb_lo_zs;
+	unique_cuda<float> aabb_up_zs;
+
+	// Indices of child nodes.
+	unique_cuda<size_t> children_0;
+	unique_cuda<size_t> children_1;
+	unique_cuda<size_t> children_2;
+	unique_cuda<size_t> children_3;
+	unique_cuda<size_t> children_4;
+	unique_cuda<size_t> children_5;
+	unique_cuda<size_t> children_6;
+	unique_cuda<size_t> children_7;
+
+	/// Concatenation of all leaf sphere index vectors.
+	unique_cuda<size_t> leaf_indices;
+
+	unique_cuda<size_t> leaf_bases; ///< Indices into leaf_indices.
+	unique_cuda<size_t> leaf_sizes; ///< Popcounts of leaf_indices.
+
+	unique_cuda<size_t> is_leaf;
+
+	size_t count;
+};
+
+/** Host-side equivalent to @ref FlattenedOctree. */
+struct FlattenedOctreeHost;
 
 /**
  * An on-host octree recursive data type.
@@ -38,6 +69,8 @@ class Octree {
 	AABB                    aabb;    ///< Bounding box.
 	size_t                  depth;   ///< Depth of the node.
 	bool                    leaf;    ///< If true = we are a leaf.
+
+	size_t push_node(FlattenedOctreeHost &out);
 
   public:
 	Octree(const HostSphereSet   &spheres,
