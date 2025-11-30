@@ -137,7 +137,14 @@ static __device__ bool sphere_hit(float &dist, float3 origin, float3 direction,
 		return false;
 
 	dist = (-b - sqrtf(discriminant)) / (2 * a);
-	return dist > 0.0;
+	if (dist > 0.0)
+		return true;
+
+	dist = (-b + sqrtf(discriminant)) / (2 * a);
+	if (dist > 0.0)
+		return true;
+
+	return false;
 }
 
 static __device__ float3 ray_direction(int x, int y, dim3 dims, float fov,
