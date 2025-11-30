@@ -172,6 +172,7 @@ static __device__ size_t cast(float3 &n, float &d, SphereSetDescriptor *spheres,
 	float  min = FLT_MAX;
 	size_t ret = NO_INTERSECTION;
 	float3 center;
+	float3 min_center;
 
 	for (size_t i = 0; i < spheres->count; ++i) {
 		center = f4_xyz(__ldg(&spheres->centers[i]));
@@ -180,12 +181,13 @@ static __device__ size_t cast(float3 &n, float &d, SphereSetDescriptor *spheres,
 		float dist;
 
 		if (sphere_hit(dist, cam, ray, center, radius) && dist < min) {
-			min = dist;
-			ret = i;
+			min_center = center;
+			min        = dist;
+			ret        = i;
 		}
 	}
 
-	n = normalize((cam + min * ray) - center);
+	n = normalize((cam + min * ray) - min_center);
 	d = min;
 
 	return ret;
