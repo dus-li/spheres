@@ -96,7 +96,8 @@ static inline call_any__ T scalar_binary_op_rhs(const T &lhs, float rhs, O op)
 #define VECOPS_OPERATORS(X) \
 	X(+)                \
 	X(-)                \
-	X(*)
+	X(*)                \
+	X(/)
 
 #define vecops_make_cwise_binary_operator(_op)                              \
 	template <typename T>                                               \
