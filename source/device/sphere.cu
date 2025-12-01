@@ -79,21 +79,6 @@ void MaterialSet::randomize()
 	}
 }
 
-static constexpr inline float3 make_cfloat3(float x, float y, float z)
-{
-	float3 ret = { .x = x, .y = y, .z = z };
-
-	return ret;
-}
-
-constexpr AABB HostSphereSet::scene_bounds()
-{
-	float lo = CENTERS_LO - RADIUSES_UP;
-	float up = CENTERS_UP + RADIUSES_UP;
-
-	return AABB(make_cfloat3(lo, lo, lo), make_cfloat3(up, up, up));
-}
-
 HostSphereSet::HostSphereSet(size_t count)
     : count(count)
     , centers(count)
@@ -107,8 +92,8 @@ void HostSphereSet::randomize(size_t material_count)
 	std::random_device rd;
 	std::mt19937       gen(rd());
 
-	std::uniform_real_distribution<float> center(CENTERS_LO, CENTERS_UP);
-	std::uniform_real_distribution<float> radius(RADIUSES_LO, RADIUSES_UP);
+	std::uniform_real_distribution<float> center(-0.5, 0.5);
+	std::uniform_real_distribution<float> radius(0.005, 0.03);
 	std::uniform_int_distribution<size_t> material(0, material_count - 1);
 
 	std::generate(centers.begin(), centers.end(), [&gen, &center]() {
@@ -154,13 +139,11 @@ Spheres::Spheres(size_t material_count, size_t sphere_count)
 		sdesc = make_unique_cuda<SphereSetDescriptor>(1);
 
 		HostSphereSet hset(sphere_count);
-		Octree        octree(hset, HostSphereSet::scene_bounds());
 
 		materials.randomize();
 		hset.randomize(material_count);
 
 		spheres = std::make_unique<SphereSet>(hset);
-		tree    = octree.flatten();
 
 		init_mdesc();
 		init_sdesc();
@@ -201,6 +184,15 @@ void Spheres::init_sdesc()
 		throw std::runtime_error("Failed to copy to device");
 }
 
+void Spheres::init_tdesc()
+{
+	try {
+		tdesc = tree->to_desc();
+	} catch (const std::exception &e) {
+		throw;
+	}
+}
+
 MaterialSetDescriptor *Spheres::get_mdesc()
 {
 	return mdesc.get();
@@ -209,6 +201,11 @@ MaterialSetDescriptor *Spheres::get_mdesc()
 SphereSetDescriptor *Spheres::get_sdesc()
 {
 	return sdesc.get();
+}
+
+FOTDesc *Spheres::get_tdesc()
+{
+	return tdesc.get();
 }
 
 } // namespace device

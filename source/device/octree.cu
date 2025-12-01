@@ -10,6 +10,60 @@
 
 namespace device {
 
+template <typename T>
+static inline void try_copy(T *dest, const T *src, size_t n)
+{
+	if (cudaMemcpy(dest, src, n, cudaMemcpyHostToDevice) != cudaSuccess)
+		throw std::runtime_error("Failed to copy to device");
+}
+
+template <typename T>
+static inline unique_cuda<T> try_clone(const std::vector<T> &src)
+{
+	size_t size = sizeof(T) * src.size();
+
+	try {
+		unique_cuda<T> ret = make_unique_cuda<T>(src.size());
+		try_copy(ret.get(), src.data(), size);
+
+		return ret;
+	} catch (const std::exception &e) {
+		throw;
+	}
+}
+
+unique_cuda<FOTDesc> FlattenedOctree::to_desc()
+{
+	FOTDesc tmp;
+
+	tmp.aabb_lo_xs   = aabb_lo_xs.get();
+	tmp.aabb_up_xs   = aabb_up_xs.get();
+	tmp.aabb_lo_ys   = aabb_lo_ys.get();
+	tmp.aabb_up_ys   = aabb_up_ys.get();
+	tmp.aabb_lo_zs   = aabb_lo_zs.get();
+	tmp.aabb_up_zs   = aabb_up_zs.get();
+	tmp.children_0   = children_0.get();
+	tmp.children_1   = children_1.get();
+	tmp.children_2   = children_2.get();
+	tmp.children_3   = children_3.get();
+	tmp.children_4   = children_4.get();
+	tmp.children_5   = children_5.get();
+	tmp.children_6   = children_6.get();
+	tmp.children_7   = children_7.get();
+	tmp.leaf_indices = leaf_indices.get();
+	tmp.leaf_bases   = leaf_bases.get();
+	tmp.leaf_sizes   = leaf_sizes.get();
+	tmp.is_leaf      = is_leaf.get();
+
+	try {
+		unique_cuda<FOTDesc> ret = make_unique_cuda<FOTDesc>(1);
+		try_copy(ret.get(), &tmp, sizeof(tmp));
+		return ret;
+	} catch (const std::exception &e) {
+		throw;
+	}
+}
+
 static inline std::vector<size_t> all_spheres(const HostSphereSet &spheres)
 {
 	std::vector<size_t> ret(spheres.count);
@@ -105,28 +159,6 @@ struct FlattenedOctreeHost {
 
 	unique_cuda<FlattenedOctree> to_device();
 };
-
-template <typename T>
-static inline void try_copy(T *dest, const T *src, size_t n)
-{
-	if (cudaMemcpy(dest, src, n, cudaMemcpyHostToDevice) != cudaSuccess)
-		throw std::runtime_error("Failed to copy to device");
-}
-
-template <typename T>
-static inline unique_cuda<T> try_clone(const std::vector<T> &src)
-{
-	size_t size = sizeof(T) * src.size();
-
-	try {
-		unique_cuda<T> ret = make_unique_cuda<T>(src.size());
-		try_copy(ret.get(), src.data(), size);
-
-		return ret;
-	} catch (const std::exception &e) {
-		throw;
-	}
-}
 
 unique_cuda<FlattenedOctree> FlattenedOctreeHost::to_device()
 {

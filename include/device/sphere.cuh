@@ -10,6 +10,7 @@
 
 namespace device {
 
+struct FOTDesc;
 struct FlattenedOctree;
 
 /** Structure of arrays containing material parameters. */
@@ -101,9 +102,11 @@ class Spheres {
 	// Cached entries passed to kernels.
 	unique_cuda<MaterialSetDescriptor> mdesc;
 	unique_cuda<SphereSetDescriptor>   sdesc;
+	unique_cuda<FOTDesc>               tdesc;
 
 	void init_mdesc();
 	void init_sdesc();
+	void init_tdesc();
 
   public:
 	Spheres(size_t material_count, size_t sphere_count);
@@ -119,6 +122,8 @@ class Spheres {
 	 * @return A device pointer to a product-type with array pointers.
 	 */
 	SphereSetDescriptor *get_sdesc();
+
+	FOTDesc *get_tdesc();
 };
 
 } // namespace device

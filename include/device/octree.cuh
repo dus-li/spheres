@@ -13,11 +13,38 @@
 namespace device {
 
 /**
+ * Flattened octree descriptor.
+ * @see FlattenedOctree
+ */
+struct FOTDesc {
+	float  *aabb_lo_xs;
+	float  *aabb_up_xs;
+	float  *aabb_lo_ys;
+	float  *aabb_up_ys;
+	float  *aabb_lo_zs;
+	float  *aabb_up_zs;
+	size_t *children_0;
+	size_t *children_1;
+	size_t *children_2;
+	size_t *children_3;
+	size_t *children_4;
+	size_t *children_5;
+	size_t *children_6;
+	size_t *children_7;
+	size_t *leaf_indices;
+	size_t *leaf_bases;
+	size_t *leaf_sizes;
+	size_t *is_leaf;
+
+	size_t count;
+};
+
+/**
  * A device-allocated octree SoA.
  * @see Octree
  */
 struct FlattenedOctree {
-	// Bounding boxes' vertices coordinates.
+	// bounding boxes' vertices cooradinates.
 	unique_cuda<float> aabb_lo_xs;
 	unique_cuda<float> aabb_up_xs;
 	unique_cuda<float> aabb_lo_ys;
@@ -25,7 +52,7 @@ struct FlattenedOctree {
 	unique_cuda<float> aabb_lo_zs;
 	unique_cuda<float> aabb_up_zs;
 
-	// Indices of child nodes.
+	// indices of child nodes.
 	unique_cuda<size_t> children_0;
 	unique_cuda<size_t> children_1;
 	unique_cuda<size_t> children_2;
@@ -35,15 +62,17 @@ struct FlattenedOctree {
 	unique_cuda<size_t> children_6;
 	unique_cuda<size_t> children_7;
 
-	/// Concatenation of all leaf sphere index vectors.
+	/// concatenation of all leaf sphere index vectors.
 	unique_cuda<size_t> leaf_indices;
 
-	unique_cuda<size_t> leaf_bases; ///< Indices into leaf_indices.
-	unique_cuda<size_t> leaf_sizes; ///< Popcounts of leaf_indices.
+	unique_cuda<size_t> leaf_bases; ///< indices into leaf_indices.
+	unique_cuda<size_t> leaf_sizes; ///< popcounts of leaf_indices.
 
 	unique_cuda<size_t> is_leaf;
 
 	size_t count;
+
+	unique_cuda<FOTDesc> to_desc();
 };
 
 /** Host-side equivalent to @ref FlattenedOctree. */
