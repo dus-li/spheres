@@ -6,18 +6,16 @@
 
 namespace device {
 
-static constexpr inline float axis_distance(float point, float lo, float up)
+static constexpr inline bool axis_intersects(float point, float lo, float up)
 {
-	return point < lo ? lo - point : point > up ? point - up : 0.0f;
+	return point >= lo && point <= up;
 }
 
 bool AABB::intersects(float3 center, float radius)
 {
-	float dx = axis_distance(center.x, lo.x, up.x);
-	float dy = axis_distance(center.y, lo.y, up.y);
-	float dz = axis_distance(center.z, lo.z, up.z);
-
-	return dx * dx + dy * dy + dz * dz <= radius * radius;
+	return axis_intersects(center.x, lo.x, up.x) &&
+	    axis_intersects(center.y, lo.y, up.y) &&
+	    axis_intersects(center.z, lo.z, up.z);
 }
 
 void AABB::split(std::array<AABB, 8> &out)

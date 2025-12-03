@@ -6,12 +6,10 @@
 #include <cstddef>
 
 #include "device/aabb.cuh"
+#include "device/flattened_octree.cuh"
 #include "device/unique.cuh"
 
 namespace device {
-
-struct FOTDesc;
-struct FlattenedOctree;
 
 /** Structure of arrays containing material parameters. */
 struct MaterialSet {
@@ -95,9 +93,9 @@ struct SphereSetDescriptor {
 
 /** Complete set of information about spheres present in the scene. */
 class Spheres {
-	MaterialSet                  materials;
-	std::unique_ptr<SphereSet>   spheres;
-	unique_cuda<FlattenedOctree> tree;
+	MaterialSet                      materials;
+	std::unique_ptr<SphereSet>       spheres;
+	std::unique_ptr<FlattenedOctree> tree;
 
 	// Cached entries passed to kernels.
 	unique_cuda<MaterialSetDescriptor> mdesc;

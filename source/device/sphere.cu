@@ -79,6 +79,20 @@ void MaterialSet::randomize()
 	}
 }
 
+static inline constexpr float3 make_cfloat3(float x, float y, float z)
+{
+	float3 ret = { .x = x, .y = y, .z = z };
+	return ret;
+}
+
+constexpr AABB HostSphereSet::scene_bounds()
+{
+	float lo = CENTERS_LO - RADIUSES_UP;
+	float up = CENTERS_UP + RADIUSES_UP;
+
+	return AABB(make_cfloat3(lo, lo, lo), make_cfloat3(up, up, up));
+}
+
 HostSphereSet::HostSphereSet(size_t count)
     : count(count)
     , centers(count)
@@ -137,8 +151,11 @@ Spheres::Spheres(size_t material_count, size_t sphere_count)
 	try {
 		mdesc = make_unique_cuda<MaterialSetDescriptor>(1);
 		sdesc = make_unique_cuda<SphereSetDescriptor>(1);
+		tdesc = make_unique_cuda<FOTDesc>(1);
 
 		HostSphereSet hset(sphere_count);
+		Octree        ot(hset, HostSphereSet::scene_bounds());
+		tree = ot.flatten();
 
 		materials.randomize();
 		hset.randomize(material_count);
@@ -147,6 +164,7 @@ Spheres::Spheres(size_t material_count, size_t sphere_count)
 
 		init_mdesc();
 		init_sdesc();
+		init_tdesc();
 	} catch (const std::exception &e) {
 		throw;
 	}
@@ -186,11 +204,34 @@ void Spheres::init_sdesc()
 
 void Spheres::init_tdesc()
 {
-	try {
-		tdesc = tree->to_desc();
-	} catch (const std::exception &e) {
-		throw;
-	}
+	FOTDesc tmp = {
+		//
+		.aabb_lo_xs   = tree->aabb_lo_xs.get(),
+		.aabb_up_xs   = tree->aabb_up_xs.get(),
+		.aabb_lo_ys   = tree->aabb_lo_ys.get(),
+		.aabb_up_ys   = tree->aabb_up_ys.get(),
+		.aabb_lo_zs   = tree->aabb_lo_zs.get(),
+		.aabb_up_zs   = tree->aabb_up_zs.get(),
+		.children_0   = tree->children_0.get(),
+		.children_1   = tree->children_1.get(),
+		.children_2   = tree->children_2.get(),
+		.children_3   = tree->children_3.get(),
+		.children_4   = tree->children_4.get(),
+		.children_5   = tree->children_5.get(),
+		.children_6   = tree->children_6.get(),
+		.children_7   = tree->children_7.get(),
+		.leaf_indices = tree->leaf_indices.get(),
+		.leaf_bases   = tree->leaf_bases.get(),
+		.leaf_sizes   = tree->leaf_sizes.get(),
+		.is_leaf      = tree->is_leaf.get(),
+		.count        = tree->count,
+	};
+
+	cudaError_t rv;
+
+	rv = cudaMemcpy(tdesc.get(), &tmp, sizeof(tmp), cudaMemcpyHostToDevice);
+	if (rv != cudaSuccess)
+		throw std::runtime_error("Failed to copy to device");
 }
 
 MaterialSetDescriptor *Spheres::get_mdesc()

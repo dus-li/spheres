@@ -147,16 +147,25 @@ static __device__ bool aabb_intersects(const float3 &ro, const float3 &invdir,
 	// Y slab
 	t1   = (blo.y - ro.y) * invdir.y;
 	t2   = (bup.y - ro.y) * invdir.y;
-	tmin = fminf(tmin, fminf(t1, t2));
-	tmax = fmaxf(tmax, fmaxf(t1, t2));
+	tmin = fmaxf(tmin, fminf(t1, t2));
+	tmax = fminf(tmax, fmaxf(t1, t2));
 
 	// Z slab
 	t1   = (blo.z - ro.z) * invdir.z;
 	t2   = (bup.z - ro.z) * invdir.z;
-	tmin = fminf(tmin, fminf(t1, t2));
-	tmax = fmaxf(tmax, fmaxf(t1, t2));
+	tmin = fmaxf(tmin, fminf(t1, t2));
+	tmax = fminf(tmax, fmaxf(t1, t2));
 
-	return (tmax >= tmin) && (tmax > 0.0f);
+	if (tmax < tmin)
+		return false;
+
+	if (tmax <= 0)
+		return false;
+
+	if ((tmin > 0 ? tmin : 0) >= max_limit)
+		return false;
+
+	return true;
 }
 
 static __device__ bool sphere_hit(float &dist, float3 origin, float3 direction,
@@ -304,9 +313,8 @@ static __device__ size_t cast(float3 &p, float3 &n, float &d,
 			    t_min,
 			    i_min,
 			    c_min);
-		} else {
-		}
-		// push_children(tree, i, stack, sp);
+		} else
+			push_children(tree, i, stack, sp);
 	}
 
 	if (i_min == NO_INTERSECTION)
